@@ -1,0 +1,60 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.Python
+venv/
+.venv/
+env/
+ENV/
+
+# --- Node / React ---
+node_modules/
+npm-debug.log*
+yarn-error.log*
+.pnp.*
+.eslintcache
+
+# --- Build output (regenerate with build_exe.ps1 / npm run build) ---
+backend/build/
+backend/dist/
+backend/_pyinstaller/
+frontend/build/
+frontend/public/logo*.png
+frontend/public/logo.svg
+frontend/public/favicon.ico
+backend/pharms.ico
+
+# --- Databases: NEVER commit patient data ---
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+pharmacy.db
+backups/
+exports/
+
+# --- Local secrets ---
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+licence-secret.txt
+issuer-secret.txt
+
+# --- Licence key issuance: private to the vendor ---
+# issue_key.py holds the signing workflow. issued_keys.json is the list of
+# every key sold, including pharmacy names. Neither belongs in a public repo,
+# and issued_keys_build.py is generated output.
+backend/issue_key.py
+backend/issued_keys.json
+backend/issued_keys_build.py
+backend/app/issued_keys_build.py
+
+# --- Editors / OS ---
+.vscode/
+.idea/
+*.swp
+Thumbs.db
+Desktop.ini

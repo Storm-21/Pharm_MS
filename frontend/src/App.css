@@ -1,0 +1,119 @@
+/* App Styles */
+
+/* Smooth transitions for all elements */
+* {
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* Main app container */
+.min-h-screen {
+  min-height: 100vh;
+}
+
+/* Content area padding */
+main {
+  min-height: calc(100vh - 64px);
+}
+
+/* Fade in animation for pages */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Apply fade-in to main content */
+main > * {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* Utility classes */
+.glass-effect {
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(10px);
+}
+
+.gradient-primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.gradient-success {
+  background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+}
+
+.gradient-warning {
+  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+}
+/* --- Splash screen animations -------------------------------------------- */
+
+@keyframes pulseSlow {
+  0%, 100% { opacity: 0.35; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.08); }
+}
+
+@keyframes pulseSlower {
+  0%, 100% { opacity: 0.25; transform: scale(1.05); }
+  50% { opacity: 0.5; transform: scale(1); }
+}
+
+@keyframes drift {
+  0%, 100% { transform: translate(-50%, 0) scale(1); }
+  50% { transform: translate(-42%, -24px) scale(1.12); }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+@keyframes shimmer {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+
+.animate-pulse-slow { animation: pulseSlow 5s ease-in-out infinite; }
+.animate-pulse-slower { animation: pulseSlower 7s ease-in-out infinite; }
+.animate-drift { animation: drift 9s ease-in-out infinite; }
+.animate-float { animation: float 3s ease-in-out infinite; }
+
+/* Gives the creator name a slow moving highlight across the text itself. */
+.animate-shimmer {
+  background-size: 200% auto;
+  animation: shimmer 4s linear infinite;
+}
+
+/* Respect users who have asked for reduced motion. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-pulse-slow,
+  .animate-pulse-slower,
+  .animate-drift,
+  .animate-float,
+  .animate-shimmer,
+  main > * {
+    animation: none;
+  }
+}

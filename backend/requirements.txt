@@ -1,0 +1,13 @@
+# Runtime dependencies for the PharmMS backend.
+#
+# PyInstaller is intentionally NOT listed here - it is a build-time tool and
+# build_exe.ps1 installs it on demand, so end users never need it.
+
+Flask==2.3.3
+Flask-CORS==4.0.0
+Flask-SQLAlchemy==3.0.5
+SQLAlchemy==2.0.21
+python-dateutil==2.8.2
+requests==2.31.0
+python-dotenv==1.0.0
+Werkzeug==2.3.7
