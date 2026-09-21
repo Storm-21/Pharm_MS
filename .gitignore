@@ -58,3 +58,14 @@ backend/app/issued_keys_build.py
 *.swp
 Thumbs.db
 Desktop.ini
+# --- Ad-hoc scratch files ---
+# One-off verification scripts and screenshots written beside the code while
+# debugging. The leading underscore marks them as throwaway, so ignore the
+# pattern rather than relying on them being deleted by hand every time.
+backend/_*
+
+# --- Local build/install logs ---
+build_exe_*.txt
+install_*.txt
+*_err.txt
+*_log.txt

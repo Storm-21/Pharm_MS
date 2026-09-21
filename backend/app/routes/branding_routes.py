@@ -76,7 +76,10 @@ def update_profile():
         editable = (
             'pharmacy_address', 'pharmacy_phone', 'pharmacy_email',
             'pharmacy_registration_no', 'pharmacy_gstin', 'pharmacist_name',
+            'pharmacist_registration_no',
             'prescription_footer',
+            'prescriber_name', 'prescriber_qualifications',
+            'prescriber_registration_no', 'prescriber_contact',
         )
         for field in editable:
             if field in payload:

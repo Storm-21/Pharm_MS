@@ -1,0 +1,117 @@
+# Build PharmMS-Setup.exe and attach it to a GitHub Release.
+#
+# TRIGGERS
+#   * pushing a tag like v2.0.0  -> builds and publishes a Release
+#   * manual run from the Actions tab (Actions -> Build installer -> Run workflow)
+#
+# WHY THIS EXISTS
+#   Building the installer needs Python, PyInstaller, Node and Windows. Doing it
+#   here means a release is reproducible from the tagged source alone: a visitor
+#   never has to build anything, they just download the .exe attached to the
+#   Release. It also means the machine that develops the app does not have to be
+#   the machine that ships it.
+#
+# NO SECRETS ARE NEEDED
+#   The workflow uses the automatic GITHUB_TOKEN to create the Release. Patient
+#   data, the SQLite database and the private licence-key tool are excluded by
+#   .gitignore and are never present in the checkout.
+
+name: Build installer
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Tag to build (leave blank to only build, no release)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build PharmMS-Setup.exe
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out the source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package.json
+
+      # build_exe.ps1 expects a venv at backend\venv\Scripts\python.exe. Creating
+      # it here keeps CI on exactly the same code path a developer runs locally,
+      # so a green build really does mean "the documented command works".
+      - name: Create the Python virtual environment
+        working-directory: backend
+        shell: pwsh
+        run: |
+          python -m venv venv
+          .\venv\Scripts\python.exe -m pip install --upgrade pip
+          .\venv\Scripts\python.exe -m pip install -r requirements.txt
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        shell: pwsh
+        run: npm ci
+
+      - name: Build the application and the installer
+        working-directory: backend
+        shell: pwsh
+        run: .\build_installer.ps1
+
+      - name: Verify the installer was produced
+        working-directory: backend
+        shell: pwsh
+        run: |
+          $exe = 'dist\PharmMS-Setup.exe'
+          if (-not (Test-Path $exe)) { throw "Installer missing: $exe" }
+          $mb = [math]::Round((Get-Item $exe).Length / 1MB, 1)
+          if ($mb -lt 5) { throw "Installer looks too small ($mb MB) - build likely failed." }
+          Write-Host "Installer built: $mb MB"
+
+      # Keep the artefact on the run itself, so it can be downloaded even when
+      # no release was created (a manual dispatch, or a non-tag build).
+      - name: Upload the installer as a build artefact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PharmMS-Setup
+          path: backend/dist/PharmMS-Setup.exe
+          if-no-files-found: error
+
+      - name: Publish the GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v') || inputs.release_tag != ''
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag = if ('${{ inputs.release_tag }}') { '${{ inputs.release_tag }}' } else { '${{ github.ref_name }}' }
+          $exe = 'backend/dist/PharmMS-Setup.exe'
+
+          # Create the release if it does not exist yet; otherwise reuse it so
+          # re-running the workflow is safe.
+          gh release view $tag 2>$null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $tag --title "PharmMS $tag" --generate-notes
+          }
+
+          # Replace any previous asset of the same name.
+          gh release upload $tag $exe --clobber
+
+          Write-Host "Release $tag now carries PharmMS-Setup.exe"

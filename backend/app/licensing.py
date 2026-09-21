@@ -189,6 +189,14 @@ BRANDING_KEYS = (
     'pharmacist_name',
     'prescription_footer',
     'licence_key',
+    # Details printed on the standard pharmacopoeial prescription.
+    'prescriber_name',
+    'prescriber_qualifications',
+    'prescriber_registration_no',
+    'prescriber_contact',
+    # Registration number of the dispensing pharmacist, printed on the
+    # signature block. Separate from the prescriber's own registration.
+    'pharmacist_registration_no',
 )
 
 LOGO_PATH_KEY = 'custom_logo_path'
@@ -228,6 +236,11 @@ def branding_settings():
         'pharmacy_gstin': get_setting('pharmacy_gstin', '') or '',
         'pharmacist_name': get_setting('pharmacist_name', '') or '',
         'prescription_footer': get_setting('prescription_footer', '') or '',
+        'prescriber_name': get_setting('prescriber_name', '') or '',
+        'prescriber_qualifications': get_setting('prescriber_qualifications', '') or '',
+        'prescriber_registration_no': get_setting('prescriber_registration_no', '') or '',
+        'prescriber_contact': get_setting('prescriber_contact', '') or '',
+        'pharmacist_registration_no': get_setting('pharmacist_registration_no', '') or '',
         'has_custom_logo': bool(get_setting(LOGO_PATH_KEY)),
         'licensed': licensed,
         'licence_key_masked': _mask(get_setting('licence_key')),

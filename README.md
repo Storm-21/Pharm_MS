@@ -48,7 +48,7 @@ deleting anything.
 | **Medicine database** | Molecular formulas, formula weights, manufacturers with drug licence numbers, Indian Pharmacopoeia and BP/USP monograph references, mechanism of action, pharmacokinetics, pregnancy categories, HSN/GST and schedule classification |
 | **Patients** | Records with allergy tracking that flags **within-class cross-reactivity** — a penicillin allergy correctly blocks amoxicillin |
 | **Prescriptions** | Write, screen and print. Safety checks run live as you add each medicine |
-| **Printed reports** | Prescriptions and full patient histories on **your own pharmacy letterhead** with your logo |
+| **Printed reports** | Prescriptions and full patient histories on **your own pharmacy letterhead** with your logo. Prescriptions follow the classical pharmacopoeial structure — superscription (℞), inscription, subscription, signatura — with the statutory **Schedule H1 red-box warning**, prescriber registration number and dual signature blocks |
 | **Dosage calculator** | Age-based dosing using Young's rule, labelled as an estimate with a confidence flag |
 | **Alternatives finder** | "What else treats this?" — ranked by indications overlap, drug class and price, screened against the patient |
 | **Inventory** | Stock levels, batch and expiry tracking, low-stock alerts, valuation in ₹ |
@@ -162,8 +162,12 @@ PharmacyMS/
 │   ├── desktop_app.py           native window entry point
 │   ├── build_exe.ps1            build the application
 │   ├── build_installer.ps1      build the setup .exe
+│   ├── create_github_repo.ps1   create the GitHub repo + first release
+│   ├── publish_github.ps1       push code and upload a release
 │   ├── import_medicines.py      bulk catalogue importer
 │   └── make_logo.py             regenerate logo assets
+├── .github/workflows/
+│   └── build-installer.yml      CI: build the .exe on a tag push
 └── frontend/
     └── src/pages/                dashboard, medicines, patients,
                                   prescriptions, inventory, dosage,
@@ -193,16 +197,45 @@ enter a clinical database looking complete.
 </details>
 
 <details>
-<summary><strong>Publishing a release</strong></summary>
+<summary><strong>Publishing to GitHub</strong></summary>
 
+### First time — create the repository and ship a release
 ```powershell
 $env:GITHUB_TOKEN = "ghp_your_token"     # repo scope
 cd backend
-.\publish_github.ps1 -Repo "yourname/pharms" -Tag v2.0.0
+.\create_github_repo.ps1 -Repo "yourname/pharms"
 ```
 
-Commits the source, builds the installer, and uploads `PharmMS-Setup.exe` as a
-release asset. Your database and the private key-issuing tool are excluded by
+That single command creates the GitHub repository, connects `origin`, commits
+the source, builds `PharmMS-Setup.exe` and publishes it as a release asset.
+Add `-DryRun` first to see every step without contacting GitHub, or
+`-SkipRelease` to publish the code without building the installer.
+
+### Later releases
+```powershell
+cd backend
+.\publish_github.ps1 -Repo "yourname/pharms" -Tag v2.0.1
+```
+
+### Releases built by GitHub, not by you
+`.github/workflows/build-installer.yml` builds the installer on GitHub's own
+Windows runners and attaches it to the release. **Push an annotated tag and the
+installer appears, with nothing built on your machine:**
+
+```powershell
+git tag v2.0.0
+git push origin v2.0.0
+```
+
+You can also run it by hand from *Actions → Build installer → Run workflow*; the
+installer is then downloadable from the run's *Artifacts* section even without a
+release.
+
+The workflow needs no secrets — it uses the automatic `GITHUB_TOKEN` — and it
+runs the same `build_installer.ps1` you do, so a green build proves the
+documented command works.
+
+Your database, `.env` files and the private key-issuing tool are excluded by
 `.gitignore` — patient data must never reach a public repository.
 
 </details>

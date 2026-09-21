@@ -37,6 +37,11 @@ export function BrandingSettings() {
     pharmacy_gstin: '',
     pharmacist_name: '',
     prescription_footer: '',
+    prescriber_name: '',
+    prescriber_qualifications: '',
+    prescriber_registration_no: '',
+    prescriber_contact: '',
+    pharmacist_registration_no: '',
   });
 
   const fileRef = useRef(null);
@@ -55,6 +60,11 @@ export function BrandingSettings() {
           pharmacy_gstin: res.data.pharmacy_gstin || '',
           pharmacist_name: res.data.pharmacist_name || '',
           prescription_footer: res.data.prescription_footer || '',
+          prescriber_name: res.data.prescriber_name || '',
+          prescriber_qualifications: res.data.prescriber_qualifications || '',
+          prescriber_registration_no: res.data.prescriber_registration_no || '',
+          prescriber_contact: res.data.prescriber_contact || '',
+          pharmacist_registration_no: res.data.pharmacist_registration_no || '',
         });
         setLogoStamp(Date.now());
       }
@@ -363,6 +373,17 @@ export function BrandingSettings() {
           {field('pharmacy_registration_no', 'Drug licence number', 'MH-PN-20B-12345')}
           {field('pharmacy_gstin', 'GSTIN', '27ABCDE1234F1Z5')}
           {field('pharmacist_name', 'Pharmacist in charge', 'Name, qualification')}
+        </div>
+
+        <h3 className="mb-2 mt-6 text-sm font-semibold text-gray-700">
+          Prescriber details (printed on the prescription)
+        </h3>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          {field('prescriber_name', 'Prescriber name', 'Dr. A. Sharma, MBBS, MD')}
+          {field('prescriber_qualifications', 'Qualifications', 'MBBS, MD (General Medicine)')}
+          {field('prescriber_registration_no', 'Medical registration number', 'MCI-123456')}
+          {field('prescriber_contact', 'Prescriber contact', '020-2345 6789 / doc@clinic.in')}
+          {field('pharmacist_registration_no', 'Pharmacist registration number', 'DPharm-98765')}
         </div>
 
         <div className="mt-4">
