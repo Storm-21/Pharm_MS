@@ -45,20 +45,40 @@ deleting anything.
 
 | Area | What you get |
 |---|---|
-| **Medicine database** | Molecular formulas, formula weights, manufacturers with drug licence numbers, Indian Pharmacopoeia and BP/USP monograph references, mechanism of action, pharmacokinetics, pregnancy categories, HSN/GST and schedule classification |
-| **Patients** | Records with allergy tracking that flags **within-class cross-reactivity** — a penicillin allergy correctly blocks amoxicillin |
+| **Medicine database** | 80 curated medicines across every major therapeutic class, with molecular formulas, formula weights, manufacturers and drug licence numbers, Indian Pharmacopoeia and BP/USP monograph references, mechanism of action, pharmacokinetics, pregnancy categories, HSN/GST and schedule classification |
+| **Patients** | Records with allergy tracking that flags **within-class cross-reactivity** — a penicillin allergy correctly blocks amoxicillin — plus weight, serum creatinine, hepatic and renal status, and pregnancy/lactation, which the dosing and safety checks depend on |
+| **Clinical workbench** | One screen for the whole counter decision: what is safe, what is in stock, what to substitute, and how long to take it for |
+| **Safety engine** | Every recommendation is gated. Graded verdicts (contraindicated / serious / caution / safe / **cannot verify**), covering allergy cross-reactivity, comorbidity conflicts, serious drug interactions, Beers Criteria for the over-65s, paediatric age limits, pregnancy and lactation, renal dosing by eGFR, hepatic impairment and dose ceilings |
 | **Prescriptions** | Write, screen and print. Safety checks run live as you add each medicine |
 | **Printed reports** | Prescriptions and full patient histories on **your own pharmacy letterhead** with your logo. Prescriptions follow the classical pharmacopoeial structure — superscription (℞), inscription, subscription, signatura — with the statutory **Schedule H1 red-box warning**, prescriber registration number and dual signature blocks |
-| **Dosage calculator** | Age-based dosing using Young's rule, labelled as an estimate with a confidence flag |
-| **Alternatives finder** | "What else treats this?" — ranked by indications overlap, drug class and price, screened against the patient |
+| **Dosage calculator** | Weight-based (mg/kg) paediatric dosing where a published figure exists, falling back to Young's rule and labelling the confidence honestly. Capped at the maximum single dose, so a heavy child cannot be handed an adult overdose |
+| **Alternatives finder** | "What else treats this?" — ranked by how little clinical substitution is needed, screened against the patient |
+| **Substitutions** | When the first choice is out of stock: same-molecule swaps first, then genuine therapeutic alternatives. Every candidate is safety-screened for *this* patient, and anything unsafe is excluded rather than merely warned about |
+| **Administration cycles** | Course length, dose interval, clock times, tapering requirements and missed-dose advice, derived per drug class so a 5-day antibiotic and a 5-day steroid are not printed as the same thing |
+| **Live reference (optional)** | Off by default and offline-first. Looks a drug up in the FDA's public labelling database, caches it locally, and keeps working without a connection once fetched. Only the drug name is ever sent |
 | **Inventory** | Stock levels, batch and expiry tracking, low-stock alerts, valuation in ₹ |
 | **Backups** | Automatic snapshots on every launch, plus one-click export and restore |
 
 ### Built for offline use
 
-Verified: the application makes **no internet requests**. No CDN fonts, no
+The application makes **no internet requests of its own**. No CDN fonts, no
 analytics, no telemetry, no cloud sync. It runs normally with networking
 completely disabled, which is what a pharmacy counter needs.
+
+The **only** feature that can use the network is the optional live reference
+lookup, and it is off unless you turn it on. When it is on:
+
+- only the **drug name** is ever sent — never a patient identifier, never a
+  record from your database
+- every result is **cached to disk**, so a drug you have looked up once keeps
+  working with no connection
+- if the network is unavailable, the cached copy is used; if there is no cached
+  copy you are told plainly that live data is unavailable, rather than being
+  shown an empty result that looks like "no warnings"
+
+Fetched data is reference material, never a recommendation, and is deliberately
+**not** fed into the recommendation engine — a label written for another
+jurisdiction is not a substitute for the curated, safety-screened set.
 
 ---
 
@@ -146,6 +166,33 @@ npm start
 </details>
 
 <details>
+<summary><strong>Tests</strong></summary>
+
+```powershell
+cd backend
+.\venv\Scripts\python.exe test_safety.py      # 26 cases: the safety gate
+.\venv\Scripts\python.exe test_migration.py   # schema upgrade on a live database
+```
+
+The safety suite is the one that matters most. It asserts that dangerous
+combinations are **blocked**, not merely flagged:
+
+- a penicillin allergy blocks amoxicillin through cross-reactivity
+- warfarin is contraindicated in pregnancy
+- aspirin under 16 is a hard stop (Reye's syndrome)
+- metformin without a recorded creatinine returns *cannot verify* rather than
+  safe, because it genuinely cannot be verified
+- a calculated dose above the ceiling is reduced, not printed
+
+The migration test runs against a **copy** of a populated database, rolls it
+back to the old schema, then verifies the file itself gained the new columns and
+lost no records. It reads the database back over an independent connection,
+which is the check that catches a migration reporting success while writing
+nothing.
+
+</details>
+
+<details>
 <summary><strong>Project structure</strong></summary>
 
 ```
@@ -155,10 +202,18 @@ PharmacyMS/
 │   │   ├── branding.py          creator identity, sealed
 │   │   ├── licensing.py         licence keys + pharmacy branding
 │   │   ├── security.py          per-record integrity seals
-│   │   ├── data/                medicine reference set + seeder
+│   │   ├── migrations.py        adds new columns to an existing database
+│   │   ├── data/                medicine reference set (batches 1-3) + seeder
 │   │   ├── models/              Medicine, Patient, Prescription, Inventory
 │   │   ├── routes/              REST API blueprints
-│   │   └── services/            dosage, interactions, alternatives, storage
+│   │   └── services/
+│   │       ├── safety_service.py           the gate every recommendation passes
+│   │       ├── dosage_service.py           weight-based dosing, ceilings
+│   │       ├── substitution_service.py     what to dispense when it is not in stock
+│   │       ├── administration_service.py   course length, timing, tapering
+│   │       ├── live_reference_service.py   optional openFDA lookup + cache
+│   │       ├── recommender_service.py      ranking
+│   │       └── storage_service.py          backups / export
 │   ├── desktop_app.py           native window entry point
 │   ├── build_exe.ps1            build the application
 │   ├── build_installer.ps1      build the setup .exe
@@ -243,14 +298,35 @@ Your database, `.env` files and the private key-issuing tool are excluded by
 ---
 
 ## Medical disclaimer
+This software is a record-keeping and decision-support tool. **None of it is a
+substitute for professional clinical judgement.**
 
-This software is a record-keeping and reference tool. Dosing information is
-derived from published adult reference doses and standard formulas; the
-recommender applies allergy and contraindication filters. **None of it is a
-substitute for professional clinical judgement.** Every calculated dose and
-recommendation is labelled as an estimate and must be verified by a qualified
-prescriber. Verify all medicine data against the current edition of the relevant
-pharmacopoeia and the manufacturer's labelling before relying on it.
+**What it does do.** The safety engine is deliberately pessimistic: when it
+cannot prove a medicine is safe for a specific patient it returns
+*cannot verify*, and that verdict is treated as unsafe for the purpose of
+recommendation. A missed contraindication harms a patient, so the engine never
+returns "safe" by default — it starts from not-proven-safe and only relaxes
+when a check actively passes. Only a fully clean assessment is ever recommended
+automatically; anything less is surfaced for a human to decide on.
+
+**What it cannot do.** It knows only what has been recorded. A medicine can be
+returned as "cannot verify" because a weight, creatinine, pregnancy status or
+allergy has not been entered — recording it is what resolves the verdict. It has
+no knowledge of anything not in the record, including over-the-counter products
+the patient has not mentioned.
+
+**Before relying on any of it:**
+
+- Every calculated dose is an estimate and must be verified by a qualified
+  prescriber. Weight-based doses are only as good as the recorded weight.
+- Verify all medicine data against the current edition of the relevant
+  pharmacopoeia and the manufacturer's labelling. Live-fetched reference data
+  comes from a different regulatory jurisdiction and is reference material
+  only.
+- Substitution suggestions are suggestions. Anything above a same-molecule swap
+  requires the prescriber's confirmation.
+- The interaction and contraindication tables are curated and therefore
+  incomplete by nature. Absence of a warning is not evidence of safety.
 
 ---
 
