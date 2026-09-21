@@ -102,6 +102,15 @@ def create_app():
         from app import licensing  # noqa: F401
         db.create_all()
         # importing registers the AppSetting model before create_all in later versions
+        # create_all() adds missing tables but never missing columns, so an
+        # existing pharmacy database would otherwise fail on the new clinical
+        # fields. Bring the schema forward before anything queries it.
+        try:
+            from app.migrations import apply_migrations
+            apply_migrations(db, app.logger)
+        except Exception as exc:  # never block startup on a migration problem
+            app.logger.warning('Schema migration skipped: %s', exc)
+
         try:
             from app.data import ensure_seeded
             ensure_seeded()

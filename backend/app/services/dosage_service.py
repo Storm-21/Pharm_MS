@@ -1,6 +1,71 @@
 from datetime import datetime, timedelta
 from app.models import Medicine, Patient, PatientAllergy, DosageGuide
 
+# Adult reference doses, and the mg/kg figure for paediatric use.
+#
+# Both are needed. A calculator that knows only the adult dose cannot dose a
+# child properly except by an age-based formula, and those ignore weight
+# entirely. Where a published per-kilogram figure exists it is always preferred,
+# because it is the actual basis of paediatric prescribing.
+#
+#   adult_mg   standard adult dose for a single dose
+#   mg_per_kg  paediatric dose per kilogram per single dose (None where the
+#              medicine is not used in children at all, e.g. statins)
+#   max_mg     cap applied after the weight calculation, because mg/kg
+#              extrapolates into unsafe territory as body weight rises
+ADULT_REFERENCE_DOSE = {
+    'paracetamol': {'adult_mg': 1000, 'mg_per_kg': 15, 'max_mg': 1000},
+    'acetaminophen': {'adult_mg': 1000, 'mg_per_kg': 15, 'max_mg': 1000},
+    'ibuprofen': {'adult_mg': 400, 'mg_per_kg': 10, 'max_mg': 400},
+    'aspirin': {'adult_mg': 325, 'mg_per_kg': 10, 'max_mg': 325},
+    'amoxicillin': {'adult_mg': 500, 'mg_per_kg': 15, 'max_mg': 500},
+    'amoxycillin': {'adult_mg': 500, 'mg_per_kg': 15, 'max_mg': 500},
+    'metformin': {'adult_mg': 500, 'mg_per_kg': None, 'max_mg': 500},
+    'omeprazole': {'adult_mg': 20, 'mg_per_kg': 1, 'max_mg': 20},
+    'lisinopril': {'adult_mg': 10, 'mg_per_kg': None, 'max_mg': 10},
+    'atorvastatin': {'adult_mg': 20, 'mg_per_kg': None, 'max_mg': 20},
+    'cetirizine': {'adult_mg': 10, 'mg_per_kg': 0.25, 'max_mg': 10},
+    'azithromycin': {'adult_mg': 500, 'mg_per_kg': 10, 'max_mg': 500},
+    'ciprofloxacin': {'adult_mg': 500, 'mg_per_kg': 15, 'max_mg': 750},
+    'diclofenac': {'adult_mg': 50, 'mg_per_kg': 1, 'max_mg': 50},
+    'pantoprazole': {'adult_mg': 40, 'mg_per_kg': 1, 'max_mg': 40},
+    'montelukast': {'adult_mg': 10, 'mg_per_kg': None, 'max_mg': 10},
+    'amlodipine': {'adult_mg': 5, 'mg_per_kg': None, 'max_mg': 10},
+    'prednisolone': {'adult_mg': 40, 'mg_per_kg': 2, 'max_mg': 40},
+    'sertraline': {'adult_mg': 50, 'mg_per_kg': None, 'max_mg': 200},
+    'gabapentin': {'adult_mg': 300, 'mg_per_kg': None, 'max_mg': 3600},
+    'cefixime': {'adult_mg': 200, 'mg_per_kg': 8, 'max_mg': 400},
+    'metronidazole': {'adult_mg': 400, 'mg_per_kg': 7.5, 'max_mg': 500},
+    'doxycycline': {'adult_mg': 100, 'mg_per_kg': 2.2, 'max_mg': 100},
+    'nitrofurantoin': {'adult_mg': 100, 'mg_per_kg': None, 'max_mg': 100},
+    'albendazole': {'adult_mg': 400, 'mg_per_kg': 15, 'max_mg': 400},
+    'ondansetron': {'adult_mg': 4, 'mg_per_kg': 0.15, 'max_mg': 8},
+    'fluconazole': {'adult_mg': 150, 'mg_per_kg': 6, 'max_mg': 400},
+    'acyclovir': {'adult_mg': 400, 'mg_per_kg': 20, 'max_mg': 800},
+    'aciclovir': {'adult_mg': 400, 'mg_per_kg': 20, 'max_mg': 800},
+    'chlorpheniramine': {'adult_mg': 4, 'mg_per_kg': 0.09, 'max_mg': 4},
+    'levocetirizine': {'adult_mg': 5, 'mg_per_kg': None, 'max_mg': 5},
+    'salbutamol': {'adult_mg': 4, 'mg_per_kg': 0.15, 'max_mg': 8},
+    'allopurinol': {'adult_mg': 100, 'mg_per_kg': None, 'max_mg': 900},
+    'colchicine': {'adult_mg': 0.5, 'mg_per_kg': None, 'max_mg': 1.0},
+    'tramadol': {'adult_mg': 50, 'mg_per_kg': None, 'max_mg': 100},
+    'warfarin': {'adult_mg': 5, 'mg_per_kg': None, 'max_mg': 10},
+    'levothyroxine': {'adult_mg': 0.05, 'mg_per_kg': None, 'max_mg': 0.2},
+    'digoxin': {'adult_mg': 0.125, 'mg_per_kg': None, 'max_mg': 0.25},
+}
+
+
+def _fmt_mg(value):
+    # Render a milligram figure without a trailing .0, so 500.0 shows as 500.
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return str(value)
+    if number == int(number):
+        return str(int(number))
+    return str(number)
+
+
 class DosageCalculator:
     """Service for calculating dosage based on patient conditions, age, and weight"""
     
@@ -57,67 +122,127 @@ class DosageCalculator:
     @staticmethod
     def calculate_default_dosage(medicine, patient, condition):
         """
-        Fallback dose estimation when no stored DosageGuide row exists.
+        Estimate a dose when no stored DosageGuide row exists.
 
-        Applies Young's rule (child dose = adult dose x age / (age + 12)) rather
-        than a fixed percentage of a guessed adult dose. The result is a
-        starting estimate and is labelled as such in special_notes, together
-        with the rule applied and a confidence flag.
-        """""
-        # Adult reference doses (mg), keyed lowercase so matching is reliable.
-        # Medicines absent from this table fall back to a generic 500 mg
-        # baseline and are reported as 'low' confidence.
-        adult_dose = {
-            'paracetamol': 1000,
-            'acetaminophen': 1000,
-            'ibuprofen': 400,
-            'amoxicillin': 500,
-            'aspirin': 325,
-            'metformin': 500,
-            'omeprazole': 20,
-            'lisinopril': 10,
-            'atorvastatin': 20,
-            'cetirizine': 10,
-            'azithromycin': 500,
-            'ciprofloxacin': 500,
-            'diclofenac': 50,
-            'pantoprazole': 40,
-            'montelukast': 10,
-            'amlodipine': 5,
-        }
+        Method, in order of preference:
 
+          1. Weight-based (mg/kg) where a published paediatric figure exists and
+             the patient's weight is on file. This is the standard basis of
+             paediatric prescribing.
+          2. Young's rule (child dose = adult dose x age / (age + 12)), which is
+             a published formula but ignores weight, so it is labelled weaker.
+          3. The adult reference dose for an adult patient.
+
+        Whatever the route, the result is capped at the medicine's maximum
+        single dose and checked against its maximum daily dose. The method and
+        a confidence level are reported, so the prescriber can see how the
+        number was reached instead of being handed an unexplained figure.
+        """
         key = (medicine.generic_name or '').strip().lower()
-        base_dose = adult_dose.get(key)
-        known_drug = base_dose is not None
-        if base_dose is None:
-            base_dose = 500
-        # Young's rule: child dose = adult dose x age / (age + 12).
-        # Used instead of the previous fixed percentages, which ignored weight
-        # and were not traceable to any published method.
-        if patient.age < 18:
+        reference = ADULT_REFERENCE_DOSE.get(key)
+        known_drug = reference is not None
+        if reference is None:
+            # No published figure on file. A 500 mg baseline for an unknown
+            # drug is a guess, and the confidence flag says so plainly rather
+            # than dressing it up as a calculation.
+            reference = {'adult_mg': 500, 'mg_per_kg': None, 'max_mg': 500}
+
+        base_dose = reference['adult_mg']
+        max_single = reference.get('max_mg') or base_dose
+        mg_per_kg = reference.get('mg_per_kg')
+
+        caveats = []
+
+        if patient.age >= 18:
+            dose = base_dose
+            method = 'Adult reference dose'
+        elif mg_per_kg and patient.weight_kg:
+            # Weight-based is the preferred route for children. The per-kg
+            # figure is per single dose, which is how these are published.
+            dose = mg_per_kg * patient.weight_kg
+            method = 'Weight-based (%s mg/kg)' % mg_per_kg
+            caveats.append(
+                'Dosed on the recorded weight of %s kg.' % patient.weight_kg)
+        elif mg_per_kg and not patient.weight_kg:
+            # The drug has a proper mg/kg dose but no weight is recorded.
+            # Falling back to an age formula is legitimate practice, but the
+            # missing weight is stated so this is never mistaken for a
+            # weight-based calculation.
+            dose = base_dose * patient.age / (patient.age + 12)
+            method = "Young's rule (weight not recorded)"
+            caveats.append(
+                'No weight on file, so an age-based formula was used. Record '
+                'the weight for an accurate paediatric dose.')
+        else:
+            # Not used in children, or no paediatric figure published.
             dose = base_dose * patient.age / (patient.age + 12)
             method = "Young's rule"
-        else:
-            dose = base_dose
-            method = 'Adult dose'
+            caveats.append(
+                'No published paediatric mg/kg dose for this medicine, so this '
+                'is an estimate only.')
+
+        # Cap at the maximum single dose. mg/kg extrapolates badly for a heavy
+        # child: 15 mg/kg for a 45 kg twelve-year-old gives 675 mg, above what
+        # an adult would take for a single dose.
+        capped = False
+        if dose > max_single:
+            dose = max_single
+            capped = True
+            caveats.append('Capped at the %s maximum single dose.'
+                           % _fmt_mg(max_single))
+
+        dose = round(dose, 3) if dose < 1 else round(dose, 2)
 
         if patient.age < 1:
             frequency = 'Every 6-8 hours as needed'
+            doses_per_day = 4
         elif patient.age < 12:
             frequency = '3 times a day'
+            doses_per_day = 3
         else:
             frequency = '2-3 times a day'
+            doses_per_day = 3
 
-        dose = round(dose, 2)
-        note = f"Estimated using {method}. Verify with a prescriber before use."
+        # Verify the resulting daily total against the ceiling. This is the one
+        # arithmetic error that actually harms people, so it is checked rather
+        # than assumed correct.
+        ceiling_finding = None
+        try:
+            from app.services.safety_service import SafetyEngine
+            daily = dose * doses_per_day
+            finding = SafetyEngine.check_dose_ceiling(medicine, daily)
+            if finding:
+                ceiling_finding = finding.to_dict()
+                ceiling = SafetyEngine.max_daily_dose(medicine)
+                if ceiling:
+                    allowed_single = ceiling / float(doses_per_day)
+                    if allowed_single < dose:
+                        dose = round(allowed_single, 2)
+                        caveats.append(
+                            'Reduced to keep the daily total within the %s '
+                            'mg/day maximum.' % ceiling)
+        except Exception:
+            # The safety layer is the authority here. If it cannot run, say so
+            # rather than silently presenting an unchecked dose.
+            caveats.append('Daily maximum could not be verified - check manually.')
+
+        confidence = 'documented' if known_drug else 'low'
+        if known_drug and patient.age < 18 and not patient.weight_kg:
+            confidence = 'moderate'
+
+        note = 'Estimated using %s. Verify with a prescriber before use.' % method
+        if caveats:
+            note = note + ' + ' + ' '.join(caveats)
         if not known_drug:
-            note += ' No adult reference dose on file; a generic 500 mg baseline was used.'
+            note += (' No reference dose on file for this medicine, so a '
+                     'generic baseline was used.')
 
-        return {
+        result = {
             'medicine_id': medicine.id,
             'medicine_name': medicine.name,
             'patient_id': patient.id,
             'patient_age': patient.age,
+            'patient_weight_kg': patient.weight_kg,
             'dosage_amount': dose,
             'dosage_unit': 'mg',
             'frequency': frequency,
@@ -125,9 +250,16 @@ class DosageCalculator:
             'special_notes': note,
             'indication': condition or 'General use',
             'calculation_method': method,
-            'confidence': 'documented' if known_drug else 'low',
-            'source': 'Estimated from adult reference dose - no stored dosage guide',
+            'confidence': confidence,
+            'dose_capped': capped,
+            'caveats': caveats,
+            'daily_total_mg': round(dose * doses_per_day, 2),
+            'max_single_dose_mg': max_single,
+            'source': 'Estimated from reference dose - no stored dosage guide',
         }
+        if ceiling_finding:
+            result['dose_ceiling_warning'] = ceiling_finding
+        return result
     
     @staticmethod
     def calculate_total_dosage(dosage_amount, frequency_str, duration_days):

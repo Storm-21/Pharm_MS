@@ -22,9 +22,10 @@ from app.models import Medicine, DosageGuide, Inventory
 from app.data.seed_medicines import MEDICINES as _BASE_MEDICINES
 from app.data.seed_medicines import DOSAGE_GUIDES as _BASE_GUIDES
 from app.data.seed_medicines_extra import EXTRA_MEDICINES, EXTRA_DOSAGE_GUIDES
+from app.data.seed_medicines_batch3 import BATCH3_MEDICINES, BATCH3_GUIDES
 from app.security import apply_seal
-MEDICINES = _BASE_MEDICINES + EXTRA_MEDICINES
-DOSAGE_GUIDES = _BASE_GUIDES + EXTRA_DOSAGE_GUIDES
+MEDICINES = _BASE_MEDICINES + EXTRA_MEDICINES + BATCH3_MEDICINES
+DOSAGE_GUIDES = _BASE_GUIDES + EXTRA_DOSAGE_GUIDES + BATCH3_GUIDES
 
 # Opening stock per medicine: (quantity, reorder_level, max_stock, storage_location)
 # Chosen so that most lines are healthy and a handful trip the reorder alert.
@@ -70,6 +71,61 @@ OPENING_STOCK = {
     "Fluconazole 150mg": (120, 30, 300, "Shelf B5 - Antifungals"),
     "Acyclovir 400mg": (88, 25, 250, "Shelf B5 - Antivirals"),
     "Artemether + Lumefantrine 20/120mg": (64, 20, 200, "Shelf B6 - Antimalarials"),
+
+    # --- Batch 3: depth across classes so the recommender has a choice ---
+    # Deliberately varied. Several lines are out of stock on purpose, so the
+    # "no stock - suggest the closest safe alternative" path has real cases to
+    # exercise rather than being dead code.
+    "Losartan 50mg": (380, 90, 900, "Shelf D2 - Cardiovascular"),
+    "Valsartan 80mg": (210, 50, 500, "Shelf D2 - Cardiovascular"),
+    "Hydrochlorothiazide 25mg": (455, 110, 1000, "Shelf D2 - Cardiovascular"),
+    "Furosemide 40mg": (520, 120, 1100, "Shelf D2 - Cardiovascular"),
+    "Spironolactone 25mg": (300, 75, 700, "Shelf D2 - Cardiovascular"),
+    "Digoxin 0.25mg": (165, 40, 400, "Shelf D2 - Cardiovascular"),
+    "Amiodarone 200mg": (72, 20, 200, "Shelf D2 - Cardiovascular"),
+    "Isosorbide Mononitrate 20mg": (240, 60, 600, "Shelf D2 - Cardiovascular"),
+    "Nifedipine 10mg": (285, 70, 700, "Shelf D2 - Cardiovascular"),
+
+    "Sertraline 50mg": (195, 50, 500, "Shelf H1 - Psychotropics"),
+    "Fluoxetine 20mg": (170, 45, 450, "Shelf H1 - Psychotropics"),
+    "Alprazolam 0.5mg": (88, 25, 250, "Shelf H1 - Psychotropics - CD register"),
+    "Phenytoin 100mg": (140, 35, 350, "Shelf H2 - Antiepileptics"),
+    "Carbamazepine 200mg": (125, 30, 300, "Shelf H2 - Antiepileptics"),
+    "Sumatriptan 50mg": (48, 15, 150, "Shelf H1 - Antimigraine"),
+
+    "Tramadol 50mg": (0, 25, 250, "Shelf A3 - Controlled - H1 register"),   # out of stock
+    "Morphine Sulphate 10mg": (12, 6, 30, "CD Cabinet - double locked"),
+    "Gabapentin 300mg": (230, 60, 600, "Shelf A3 - Neuropathic"),
+
+    "Budesonide + Formoterol Inhaler": (54, 15, 150, "Shelf E2 - Respiratory"),
+    "Ipratropium Inhaler": (41, 12, 120, "Shelf E2 - Respiratory"),
+    "Prednisolone 10mg": (360, 90, 800, "Shelf E4 - Corticosteroids"),
+
+    "Ondansetron 4mg": (290, 70, 700, "Shelf C2 - Antiemetics"),
+    "Metoclopramide 10mg": (315, 80, 800, "Shelf C2 - Antiemetics"),
+    "Lactulose Solution": (125, 30, 300, "Shelf C3 - Laxatives"),
+    "Dicyclomine 10mg": (275, 70, 700, "Shelf C3 - Antispasmodics"),
+
+    "Allopurinol 100mg": (340, 85, 800, "Shelf A4 - Antigout"),
+    "Colchicine 0.5mg": (155, 40, 400, "Shelf A4 - Antigout"),
+    "Alendronate 70mg": (95, 25, 250, "Shelf A5 - Bone health"),
+
+    "Ethinylestradiol + Levonorgestrel": (180, 45, 450, "Shelf G2 - Hormonal"),
+    "Medroxyprogesterone 10mg": (145, 35, 350, "Shelf G2 - Hormonal"),
+
+    "Levofloxacin 500mg": (155, 40, 400, "Shelf B2 - Antibiotics"),
+    "Cefixime 200mg": (205, 50, 500, "Shelf B2 - Antibiotics"),
+    "Ampicillin + Cloxacillin": (190, 50, 500, "Shelf B2 - Antibiotics"),
+    "Amikacin 500mg Injection": (34, 12, 100, "Shelf B4 - Injectables"),
+    "Nitrofurantoin 100mg": (175, 45, 450, "Shelf B2 - Antibiotics"),
+    "Albendazole 400mg": (290, 70, 700, "Shelf B7 - Anthelmintics"),
+    "Praziquantel 600mg": (42, 12, 120, "Shelf B7 - Anthelmintics"),
+    "Clotrimazole 1% Cream": (88, 22, 220, "Shelf B5 - Antifungals"),
+
+    "Moxifloxacin 0.5% Eye Drops": (36, 12, 120, "Shelf I1 - Ophthalmic"),
+    "Timol 0.5% Eye Drops": (44, 12, 120, "Shelf I1 - Ophthalmic"),
+
+    "Tetanus Toxoid Injection": (58, 20, 200, "Cold Chain - Refrigerator 2-8C"),
 }
 
 
