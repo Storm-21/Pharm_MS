@@ -121,9 +121,29 @@ your pharmacy's own name and logo.
 ---
 
 ## Screenshots
+![Clinical workbench](docs/img/workbench.png)
 
-*(Add screenshots here after your first run — `docs/screenshot-dashboard.png`,
-`docs/screenshot-prescription.png`, `docs/screenshot-branding.png`.)*
+*See `docs/img/` for the full set. They are taken from the shipping build, not
+mockups.*
+
+---
+
+## Project website
+
+The landing page lives in [`docs/`](docs/) and is published with GitHub Pages —
+no build step, no framework, no CDN, and no JavaScript. That is deliberate: a
+site advertising offline-first software should not itself depend on a network
+fetch to render.
+
+It is deployed automatically by `.github/workflows/pages.yml` on any push to
+`main` that touches `docs/`. **One-time setup:** in the repository, go to
+*Settings → Pages → Build and deployment → Source* and select **GitHub
+Actions**. After that the site is live at
+`https://<your-username>.github.io/pharms/`.
+
+The deploy job verifies the site before publishing — every image referenced by
+the page must exist, and the download button must point at a release asset —
+because a landing page with a dead download link is worse than no page at all.
 
 ---
 

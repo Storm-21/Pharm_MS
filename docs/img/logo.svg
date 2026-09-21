@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128"
+     role="img" aria-label="Pharmacy Management System">
+ <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#1e3a8a"/>
+      <stop offset="100%" stop-color="#2563eb"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="26%" cy="18%" r="70%">
+      <stop offset="0%" stop-color="#22d3ee" stop-opacity="0.45"/>
+      <stop offset="100%" stop-color="#22d3ee" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="soft" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="1.2" dy="1.2" stdDeviation="1.2" flood-color="#0b1220" flood-opacity="0.35"/>
+    </filter>
+ </defs>
+ <rect x="0" y="0" width="128" height="128" rx="28" fill="url(#bg)"/>
+ <rect x="0" y="0" width="128" height="128" rx="28" fill="url(#glow)"/>
+ <g filter="url(#soft)">
+    <rect x="53" y="21.8" width="22" height="84.4" rx="11" fill="#ffffff"/>
+    <rect x="21.8" y="53" width="84.4" height="22" rx="11" fill="#e0f7ff"/>
+    <rect x="58.6" y="30.6" width="4.6" height="60" rx="2.3" fill="#ffffff" opacity="0.92"/>
+ </g>
+</svg>

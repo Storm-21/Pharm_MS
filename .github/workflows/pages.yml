@@ -1,0 +1,108 @@
+# Publish the landing site to GitHub Pages.
+#
+# TRIGGER
+#   Any push to main that changes the site, plus a manual run from the Actions
+#   tab. The site is static HTML and CSS, so there is nothing to build - this
+#   workflow verifies docs/ and uploads it as-is.
+#
+# ONE-TIME SETUP
+#   Repository -> Settings -> Pages -> Build and deployment -> Source:
+#   "GitHub Actions". Until that is set, this workflow cannot publish.
+#
+# WHY docs/ AND NOT A gh-pages BRANCH
+#   Deploying from a folder keeps the site beside the source it describes, so a
+#   change to a feature and the page advertising it land in the same commit.
+#   A separate branch would drift out of step.
+#
+# NO SECRETS
+#   Pages deployment uses the automatic GITHUB_TOKEN with the pages and
+#   id-token permissions below. Nothing has to be configured by hand.
+
+name: Deploy landing site
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never let two deploys race. `queue` keeps a run pending rather than
+# cancelling it, so a quick pair of pushes still ends with the newest site
+# live instead of the older one being dropped mid-deploy.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Verify and package the site
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the source
+        uses: actions/checkout@v4
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      # Verify before publishing. A landing page whose download link or
+      # screenshots are broken looks worse than no page at all, and this is the
+      # only point at which it can be caught automatically.
+      - name: Verify the site is complete
+        shell: bash
+        run: |
+          set -euo pipefail
+          fail=0
+
+          for required in docs/index.html docs/styles.css docs/img/logo.png; do
+            if [ ! -f "$required" ]; then
+              echo "MISSING: $required"
+              fail=1
+            fi
+          done
+
+          # Every image the page references must exist.
+          while read -r src; do
+            [ -z "$src" ] && continue
+            if [ ! -f "docs/$src" ]; then
+              echo "BROKEN IMAGE REFERENCE: docs/$src"
+              fail=1
+            fi
+          done < <(grep -o 'src="img/[^"]*"' docs/index.html \
+                   | sed 's/src="//;s/"$//' | sort -u)
+
+          # The download button must point at a release asset, not a dead path.
+          if ! grep -q 'releases/latest/download/PharmMS-Setup.exe' docs/index.html; then
+            echo "The download link does not point at a release asset."
+            fail=1
+          fi
+
+          if [ "$fail" -ne 0 ]; then
+            echo "Site verification failed."
+            exit 1
+          fi
+
+          echo "Site verified."
+
+      - name: Upload the site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

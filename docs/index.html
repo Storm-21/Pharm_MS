@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PharmMS - Offline pharmacy management software for Windows</title>
+<meta name="description" content="Pharmacy management software that runs entirely on your own computer. Inventory, patients, prescriptions, a safety engine that refuses to guess, and printed reports on your own letterhead. No internet required.">
+
+<!-- Open Graph, so the link previews properly when shared. -->
+<meta property="og:title" content="PharmMS - Offline pharmacy management software">
+<meta property="og:description" content="Inventory, patients, prescriptions and a safety engine that refuses to guess. Runs entirely offline on Windows.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="img/workbench.png">
+
+<link rel="icon" href="img/logo.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- ================================================================ -->
+<!-- Header                                                           -->
+<!-- ================================================================ -->
+<header class="site-header">
+ <div class="wrap header-inner">
+    <a class="brand" href="#top">
+      <img src="img/logo.png" alt="" width="36" height="36">
+      <span>PharmMS</span>
+    </a>
+    <nav class="site-nav">
+      <a href="#features">Features</a>
+      <a href="#safety">Safety</a>
+      <a href="#screens">Screenshots</a>
+      <a href="#faq">FAQ</a>
+      <a class="btn btn-small" href="https://github.com/storm-21/pharms" target="_blank" rel="noopener">
+        GitHub
+      </a>
+    </nav>
+ </div>
+</header>
+
+<main id="top">
+
+<!-- ================================================================ -->
+<!-- Hero                                                            -->
+<!-- ================================================================ -->
+<section class="hero">
+ <div class="wrap hero-inner">
+    <div class="hero-copy">
+      <p class="eyebrow">Offline pharmacy management for Windows</p>
+      <h1>Run your pharmacy counter<br>without an internet connection.</h1>
+      <p class="lede">
+        Inventory, patients, prescriptions and printed reports - all on your own
+        computer. The safety engine checks every medicine against the patient in
+        front of you, and when it cannot prove something is safe it says so
+        instead of guessing.
+      </p>
+
+      <div class="cta-row">
+        <a class="btn btn-primary btn-large"
+           href="https://github.com/storm-21/pharms/releases/latest/download/PharmMS-Setup.exe">
+          Download for Windows
+        </a>
+        <a class="btn btn-ghost btn-large"
+           href="https://github.com/storm-21/pharms" target="_blank" rel="noopener">
+          View source
+        </a>
+      </div>
+
+      <p class="micro">
+        Windows 10 or 11 &middot; No Python, no Node.js &middot;
+        <strong>No administrator rights needed</strong> &middot; Works with networking off
+      </p>
+    </div>
+
+    <div class="hero-shot">
+      <img src="img/workbench.png"
+           alt="The PharmMS clinical workbench showing safe in-stock medicines, options set aside on safety grounds, and a warning that missing weight and creatinine limit what can be verified.">
+    </div>
+ </div>
+</section>
+
+<!-- ================================================================ -->
+<!-- Trust bar                                                        -->
+<!-- ================================================================ -->
+<section class="strip">
+ <div class="wrap strip-inner">
+    <div><strong>81</strong><span>curated medicines</span></div>
+    <div><strong>71</strong><span>therapeutic classes</span></div>
+    <div><strong>8</strong><span>safety checks per medicine</span></div>
+    <div><strong>0</strong><span>internet requests by default</span></div>
+ </div>
+</section>
+
+<!-- ================================================================ -->
+<!-- Features                                                        -->
+<!-- ================================================================ -->
+<section id="features" class="section">
+ <div class="wrap">
+    <h2>What it does</h2>
+    <p class="section-lede">
+      Built for a community pharmacy counter, not a hospital IT department.
+    </p>
+
+    <div class="grid">
+      <article class="card">
+        <h3>Medicine database</h3>
+        <p>
+          81 medicines across 71 therapeutic classes, each with molecular
+          formula, manufacturer and drug licence number, Indian Pharmacopoeia
+          and BP/USP monograph references, mechanism of action,
+          pharmacokinetics, pregnancy category, and HSN/GST and schedule
+          classification.
+        </p>
+      </article>
+
+      <article class="card">
+        <h3>Patients and allergies</h3>
+        <p>
+          Allergy tracking that understands <em>within-class</em>
+          cross-reactivity - a recorded penicillin allergy correctly blocks
+          amoxicillin - plus weight, serum creatinine, hepatic and renal status,
+          and pregnancy or lactation.
+        </p>
+      </article>
+
+      <article class="card">
+        <h3>Weight-based dosing</h3>
+        <p>
+          Paediatric doses calculated from published mg/kg figures where they
+          exist, falling back to Young's rule and labelling the confidence
+          honestly. Every result is capped at the maximum single dose, so a
+          heavy child cannot be handed an adult overdose.
+        </p>
+      </article>
+
+      <article class="card">
+        <h3>Substitutions</h3>
+        <p>
+          When the first choice is out of stock: same-molecule swaps first, then
+          genuine therapeutic alternatives ranked by how little clinical
+          substitution is needed. Anything unsafe for the patient is excluded,
+          not merely warned about.
+        </p>
+      </article>
+
+      <article class="card">
+        <h3>Administration cycles</h3>
+        <p>
+          Course length, dose interval, clock times, tapering requirements and
+          missed-dose advice, derived per drug class - so a 5-day antibiotic and
+          a 5-day steroid are not printed as if they were the same thing.
+        </p>
+      </article>
+
+      <article class="card">
+        <h3>Printed reports</h3>
+        <p>
+          Prescriptions laid out in the classical pharmacopoeial order -
+          superscription, inscription, subscription, signatura - with the
+          statutory Schedule H1 red-box warning, prescriber registration number
+          and dual signature blocks. Your pharmacy name and logo on every sheet.
+        </p>
+      </article>
+
+      <article class="card">
+        <h3>Inventory</h3>
+        <p>
+          Stock levels, batch and expiry tracking, low-stock alerts, and
+          valuation in rupees. Out-of-stock lines feed the substitution engine,
+          so an empty shelf produces an answer rather than a shrug.
+        </p>
+      </article>
+
+      <article class="card">
+        <h3>Backups</h3>
+        <p>
+          Automatic snapshots on every launch, plus one-click export and
+          restore. Your records live outside the program folder, so upgrading,
+          reinstalling or moving the app never touches patient data.
+        </p>
+      </article>
+    </div>
+ </div>
+</section>
+
+<!-- ================================================================ -->
+<!-- Safety - the differentiator                                     -->
+<!-- ================================================================ -->
+<section id="safety" class="section section-dark">
+ <div class="wrap">
+    <h2>It refuses to guess</h2>
+    <p class="section-lede">
+      Most software tells you what you asked for. This tells you what it can
+      prove - and stays quiet about the rest.
+    </p>
+
+    <div class="safety-grid">
+      <div class="safety-copy">
+        <h3>Every recommendation passes one gate</h3>
+        <p>
+          The safety engine is deliberately pessimistic. It starts from
+          <em>not proven safe</em> and only relaxes when a check actively
+          passes. A missed contraindication harms a patient; a missed sale costs
+          money. The asymmetry is intentional.
+        </p>
+
+        <h3>Five verdicts, not a yes/no</h3>
+        <ul class="verdicts">
+          <li><span class="pill pill-red">Contraindicated</span> Do not dispense. There is no override path.</li>
+          <li><span class="pill pill-red">Not safe</span> A serious risk for this patient.</li>
+          <li><span class="pill pill-amber">Caution</span> Pharmacist review needed. Never auto-recommended.</li>
+          <li><span class="pill pill-green">Safe</span> Every check passed. The only auto-recommended verdict.</li>
+          <li><span class="pill pill-grey">Cannot verify</span> A required check could not run. Treated as unsafe.</li>
+        </ul>
+
+        <h3>What it checks</h3>
+        <p>
+          Allergy and cross-reactivity &middot; comorbidity conflicts &middot;
+          serious drug interactions &middot; Beers Criteria for the over-65s
+          &middot; paediatric age limits &middot; pregnancy and lactation
+          &middot; renal dosing by eGFR &middot; hepatic impairment &middot;
+          dose ceilings &middot; form and unit consistency.
+        </p>
+      </div>
+
+      <div class="safety-example">
+        <p class="example-label">Worked example</p>
+        <table class="example-table">
+          <thead>
+            <tr><th>Patient</th><th>eGFR</th><th>Verdict</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>No creatinine on file</td>
+              <td>&mdash;</td>
+              <td><span class="pill pill-grey">Cannot verify</span></td>
+            </tr>
+            <tr>
+              <td>Creatinine 0.9</td>
+              <td>100.2</td>
+              <td><span class="pill pill-green">Safe</span></td>
+            </tr>
+            <tr>
+              <td>Creatinine 2.4</td>
+              <td>27.3</td>
+              <td><span class="pill pill-red">Not safe</span></td>
+            </tr>
+          </tbody>
+        </table>
+        <p class="example-note">
+          The same medicine, metformin, for three patients. It is not
+          recommended for the first patient because the answer genuinely cannot
+          be known without a creatinine result - and the software says so rather
+          than assuming normal kidney function.
+        </p>
+      </div>
+    </div>
+ </div>
+</section>
+
+<!-- ================================================================ -->
+<!-- Screenshots                                                     -->
+<!-- ================================================================ -->
+<section id="screens" class="section">
+ <div class="wrap">
+    <h2>Screenshots</h2>
+    <p class="section-lede">
+      Taken from the shipping build, not mockups.
+    </p>
+
+    <div class="shots">
+      <figure>
+        <img src="img/workbench.png" alt="Clinical workbench showing safe in-stock options and medicines set aside on safety grounds." loading="lazy">
+        <figcaption><strong>Clinical workbench</strong> - the whole counter decision on one screen: what is safe, what is in stock, what to substitute.</figcaption>
+      </figure>
+
+      <figure>
+        <img src="img/dashboard.png" alt="Dashboard showing medicine, patient and prescription counts, low-stock alerts and expiry warnings." loading="lazy">
+        <figcaption><strong>Dashboard</strong> - stock alerts and expiry warnings the moment you open the app.</figcaption>
+      </figure>
+
+      <figure>
+        <img src="img/medicines.png" alt="Medicine database browser with monograph details, pharmacopoeia references and pricing." loading="lazy">
+        <figcaption><strong>Medicine database</strong> - monographs, pharmacopoeia references and pricing.</figcaption>
+      </figure>
+
+      <figure>
+        <img src="img/prescriptions.png" alt="Prescription list with print and safety-screening actions." loading="lazy">
+        <figcaption><strong>Prescriptions</strong> - write, screen and print, with safety checks running live as each medicine is added.</figcaption>
+      </figure>
+
+      <figure>
+        <img src="img/patients.png" alt="Patient records with allergy tracking and clinical details." loading="lazy">
+        <figcaption><strong>Patients</strong> - allergy tracking, clinical measurements and prescription history.</figcaption>
+      </figure>
+
+      <figure>
+        <img src="img/inventory.png" alt="Inventory list with batch numbers, expiry dates and stock levels." loading="lazy">
+        <figcaption><strong>Inventory</strong> - batch and expiry tracking with valuation.</figcaption>
+      </figure>
+    </div>
+ </div>
+</section>
+
+<!-- ================================================================ -->
+<!-- Download                                                        -->
+<!-- ================================================================ -->
+<section id="download" class="section section-tint">
+ <div class="wrap download-inner">
+    <h2>Download and install</h2>
+    <ol class="steps">
+      <li>Download <strong>PharmMS-Setup.exe</strong> below.</li>
+      <li>Double-click it and click <strong>Install</strong>.</li>
+      <li>Open PharmMS from the Desktop or Start Menu shortcut.</li>
+    </ol>
+
+    <p class="micro">
+      That is the whole process. No Python, no Node.js, no administrator rights,
+      and no internet connection required at any point.
+    </p>
+
+    <a class="btn btn-primary btn-large"
+       href="https://github.com/storm-21/pharms/releases/latest/download/PharmMS-Setup.exe">
+      Download PharmMS-Setup.exe
+    </a>
+
+    <p class="micro">
+      <a href="https://github.com/storm-21/pharms/releases/latest" target="_blank" rel="noopener">All releases and version history</a>
+    </p>
+
+    <div class="notice">
+      <h3>Windows SmartScreen</h3>
+      <p>
+        The installer is not code-signed, so Windows may show a SmartScreen
+        warning on first run. Click <strong>More info</strong>, then
+        <strong>Run anyway</strong>. Code signing requires a paid certificate.
+      </p>
+    </div>
+
+    <div class="notice notice-info">
+      <h3>Where your data lives</h3>
+      <p>
+        Your records are stored at
+        <code>%LOCALAPPDATA%\PharmMS\pharmacy.db</code> - deliberately
+        <strong>outside</strong> the program folder. Upgrading, reinstalling or
+        moving the application never touches patient data, and uninstalling asks
+        before deleting anything.
+      </p>
+    </div>
+ </div>
+</section>
+
+<!-- ================================================================ -->
+<!-- FAQ                                                             -->
+<!-- ================================================================ -->
+<section id="faq" class="section">
+ <div class="wrap narrow">
+    <h2>Questions</h2>
+
+    <details>
+      <summary>Does it really work with no internet?</summary>
+      <p>
+        Yes. The application makes no internet requests of its own - no CDN
+        fonts, no analytics, no telemetry, no cloud sync. It runs normally with
+        networking completely disabled.
+      </p>
+      <p>
+        One optional feature can use the network: a drug reference lookup that
+        pulls label data from the FDA's public database. It is <strong>off
+        unless you turn it on</strong>, sends nothing but the drug name, caches
+        every result so it keeps working offline afterwards, and is never fed
+        into the recommendation engine. If it cannot reach the network it tells
+        you plainly, rather than showing an empty result that looks like "no
+        warnings".
+      </p>
+    </details>
+
+    <details>
+      <summary>Do I need administrator rights?</summary>
+      <p>
+        No. It installs to your own user folder and registers itself under
+        <em>Apps &amp; features</em> so you can uninstall it normally.
+      </p>
+    </details>
+
+    <details>
+      <summary>What happens to my records when I upgrade?</summary>
+      <p>
+        Nothing. Your database lives outside the program folder, and the
+        installer brings the schema forward in place - adding new columns
+        without touching existing rows. There is a test that proves this against
+        a populated database, because losing patient records during an upgrade
+        would be unacceptable.
+      </p>
+    </details>
+
+    <details>
+      <summary>Is this a substitute for a pharmacist or prescriber?</summary>
+      <p>
+        No, and it does not pretend to be. It is a record-keeping and
+        decision-support tool. Every calculated dose is an estimate to be
+        verified by a qualified prescriber. Verify medicine data against the
+        current edition of the relevant pharmacopoeia and the manufacturer's
+        labelling before relying on it.
+      </p>
+      <p>
+        What it will do is refuse to recommend something it cannot verify, and
+        tell you what to record so it can. Absence of a warning is not evidence
+        of safety - the interaction tables are curated and therefore incomplete
+        by nature.
+      </p>
+    </details>
+
+    <details>
+      <summary>Can I put my own pharmacy name and logo on it?</summary>
+      <p>
+        Yes. Go to the <strong>Branding</strong> tab, enter your pharmacy name
+        and licence key, and upload your logo and address, phone, drug licence
+        number and GSTIN. Your details then appear on the app's startup screen
+        and on every printed prescription and patient report.
+      </p>
+    </details>
+
+    <details>
+      <summary>Is the source code available?</summary>
+      <p>
+        Yes -
+        <a href="https://github.com/storm-21/pharms" target="_blank" rel="noopener">github.com/storm-21/pharms</a>.
+        The README covers building from source, the test suites, and adding
+        medicines in bulk from a CDSCO or Jan Aushadhi catalogue.
+      </p>
+    </details>
+ </div>
+</section>
+
+</main>
+
+<!-- ================================================================ -->
+<!-- Footer                                                          -->
+<!-- ================================================================ -->
+<footer class="site-footer">
+ <div class="wrap footer-inner">
+    <div>
+      <p class="footer-brand">PharmMS</p>
+      <p class="micro">Offline pharmacy management for Windows.</p>
+    </div>
+    <nav class="footer-nav">
+      <a href="https://github.com/storm-21/pharms" target="_blank" rel="noopener">Source code</a>
+      <a href="https://github.com/storm-21/pharms/releases/latest" target="_blank" rel="noopener">Releases</a>
+      <a href="https://github.com/storm-21/pharms/issues" target="_blank" rel="noopener">Report an issue</a>
+    </nav>
+ </div>
+
+ <div class="wrap">
+    <p class="disclaimer">
+      <strong>Medical disclaimer.</strong> PharmMS is a record-keeping and
+      decision-support tool. Dosing information is derived from published adult
+      reference doses and standard formulas; the safety engine applies allergy,
+      contraindication, interaction, renal and age filters. None of it is a
+      substitute for professional clinical judgement. Every calculated dose and
+      recommendation must be verified by a qualified prescriber, and all
+      medicine data should be checked against the current edition of the
+      relevant pharmacopoeia and the manufacturer's labelling.
+    </p>
+    <p class="micro credit">Designed &amp; developed by Jayant</p>
+ </div>
+</footer>
+
+</body>
+</html>
