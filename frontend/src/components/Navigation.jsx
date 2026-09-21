@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import {
   Pill, Users, FileText, Package, Brain, Menu, X, Calculator, GitCompare, Database,
-  Store,
+  Store, Stethoscope,
 } from 'lucide-react';
 
 export function Navigation({ branding }) {
@@ -11,6 +11,7 @@ export function Navigation({ branding }) {
 
   const navItems = [
     { path: '/', label: 'Dashboard', icon: Pill },
+    { path: '/workbench', label: 'Workbench', icon: Stethoscope },
     { path: '/medicines', label: 'Medicine Database', icon: Pill },
     { path: '/patients', label: 'Patients', icon: Users },
     { path: '/prescriptions', label: 'Prescriptions', icon: FileText },

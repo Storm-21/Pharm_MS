@@ -12,6 +12,7 @@ import { PrescriptionManagement } from './pages/PrescriptionManagement';
 import { AlternativeMedicines } from './pages/AlternativeMedicines';
 import { DataStorage } from './pages/DataStorage';
 import { BrandingSettings } from './pages/BrandingSettings';
+import { ClinicalWorkbench } from './pages/ClinicalWorkbench';
 import { apiClient } from './api';
 import './App.css';
 
@@ -93,6 +94,7 @@ function App() {
         <main className="max-w-7xl mx-auto px-4 py-8">
           <Routes>
             <Route path="/" element={<DashboardPage />} />
+            <Route path="/workbench" element={<ClinicalWorkbench />} />
             <Route path="/medicines" element={<MedicineDatabase />} />
             <Route path="/dosage" element={<DosageCalculator />} />
             <Route path="/recommender" element={<MedicineRecommender />} />

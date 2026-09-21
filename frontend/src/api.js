@@ -161,6 +161,65 @@ export const apiClient = {
   getMedicinesByCondition: (condition, patientId = null, limit = 20) =>
     request(`/recommender/by-condition${query({ condition, patient_id: patientId, limit })}`),
 
+  // --- Full clinical assessment ------------------------------------------
+  // The authoritative safety endpoint: comorbidity, renal, hepatic, age,
+  // pregnancy and form checks as well as allergy and interaction, with a
+  // graded verdict rather than a yes/no.
+  assessSafety: (patientId, medicineId, doseUnit = null) =>
+    request('/recommender/assess', {
+      method: 'POST',
+      body: JSON.stringify({
+        patient_id: patientId,
+        medicine_id: medicineId,
+        dose_unit: doseUnit,
+      }),
+    }),
+
+  // Course length, timing, tapering and missed-dose advice.
+  getAdministrationPlan: (medicineId, options = {}) =>
+    request('/recommender/administration-plan', {
+      method: 'POST',
+      body: JSON.stringify({
+        medicine_id: medicineId,
+        frequency: options.frequency,
+        duration_days: options.durationDays,
+        indication: options.indication,
+      }),
+    }),
+
+  // --- Substitution: what to dispense when the first choice is unavailable
+  getSubstitutes: (medicineId, patientId = null, options = {}) =>
+    request(`/recommender/substitutes/${medicineId}${query({
+      patient_id: patientId,
+      include_different_class: options.includeDifferentClass ? 1 : undefined,
+      require_stock: options.requireStock === false ? 0 : 1,
+    })}`),
+
+  // Can this be dispensed now, and if not, what is the closest thing that can.
+  getDispensePlan: (medicineId, patientId, quantityNeeded = 1) =>
+    request('/recommender/dispense-plan', {
+      method: 'POST',
+      body: JSON.stringify({
+        medicine_id: medicineId,
+        patient_id: patientId,
+        quantity_needed: quantityNeeded,
+      }),
+    }),
+
+  // "The patient needs something for X" - in stock, out of stock with a
+  // substitute, and what was set aside on safety.
+  resolveCondition: (condition, patientId = null, limit = 8) =>
+    request(`/recommender/resolve${query({ condition, patient_id: patientId, limit })}`),
+
+  // --- Optional live reference lookup (offline-first, cached) -------------
+  getLiveReference: (drugName, refresh = false) =>
+    request(`/recommender/reference/${encodeURIComponent(drugName)}${query({ refresh: refresh ? 1 : undefined })}`),
+  getReferenceCacheStats: () => request('/recommender/reference-cache'),
+  clearReferenceCache: () =>
+    request('/recommender/reference-cache', { method: 'DELETE' }),
+  enrichMedicine: (medicineId) =>
+    request(`/recommender/enrich/${medicineId}`, { method: 'POST' }),
+
   // --- Local storage / backups -------------------------------------------
   getStorageInfo: () => request('/storage/info'),
   getSnapshots: () => request('/storage/snapshots'),
