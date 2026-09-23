@@ -8,6 +8,8 @@ import {
   XCircle,
   Loader2,
   Info,
+  Scale,
+  Ruler,
 } from 'lucide-react';
 
 /**
@@ -31,8 +33,12 @@ export function DosageCalculator() {
   const [totalDosage, setTotalDosage] = useState(null);
   const [drugCycle, setDrugCycle] = useState(null);
   const [safety, setSafety] = useState(null);
+  const [weightDose, setWeightDose] = useState(null);
+  const [dosesPerDay, setDosesPerDay] = useState('3');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  const selectedPatient = patients.find((p) => String(p.id) === String(patientId)) || null;
 
   useEffect(() => {
     Promise.all([apiClient.getPatients(), apiClient.getMedicines()])
@@ -54,18 +60,21 @@ export function DosageCalculator() {
     setTotalDosage(null);
     setDrugCycle(null);
     setSafety(null);
+    setWeightDose(null);
 
     const pid = Number(patientId);
     const mid = Number(medicineId);
 
     try {
       const dosageResult = await apiClient.calculateDosage(pid, mid, condition);
+      // A rejected calculation is reported, not swallowed. The API client
+      // throws on a non-2xx response, so this only runs on a genuine success.
       if (!dosageResult || !dosageResult.success) {
         setError((dosageResult && dosageResult.error) || 'Could not calculate a dosage.');
       } else {
         setDosage(dosageResult.data);
 
-        const [totalResult, cycleResult, safetyResult] = await Promise.all([
+        const [totalResult, cycleResult, safetyResult, weightResult] = await Promise.all([
           apiClient.calculateTotalDosage(
             dosageResult.data.dosage_amount,
             dosageResult.data.frequency,
@@ -73,14 +82,20 @@ export function DosageCalculator() {
           ),
           apiClient.getDrugCycle(mid),
           apiClient.safetyScreen(pid, mid),
+          // The full weight-based working, shown separately so the arithmetic
+          // is visible even when the stored guide supplied the dose.
+          apiClient
+            .calculateWeightDose(pid, mid, { dosesPerDay: Number(dosesPerDay) || undefined })
+            .catch(() => null),
         ]);
 
         if (totalResult && totalResult.success) setTotalDosage(totalResult.data);
         if (cycleResult && cycleResult.success) setDrugCycle(cycleResult.data);
         if (safetyResult && safetyResult.success) setSafety(safetyResult.data);
+        if (weightResult && weightResult.success) setWeightDose(weightResult.data);
       }
     } catch (err) {
-      setError('Could not calculate a dosage. Check the backend is running.');
+      setError(err.message || 'Could not calculate a dosage. Check the backend is running.');
     } finally {
       setLoading(false);
     }
@@ -93,7 +108,7 @@ export function DosageCalculator() {
       {/* Input Section */}
       <div className="bg-white rounded-lg shadow p-6">
         <h2 className="text-xl font-semibold mb-4">Calculate Dosage</h2>
-        
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Patient *</label>
@@ -105,10 +120,22 @@ export function DosageCalculator() {
               <option value="">Select a patient</option>
               {patients.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.first_name} {p.last_name} ({p.age} yrs)
+                  {p.first_name} {p.last_name} ({p.age} yrs
+                  {p.weight_kg ? `, ${p.weight_kg} kg` : ', no weight'})
                 </option>
               ))}
             </select>
+            {/* The weight and BSA drive the whole calculation, so they are
+                shown here rather than hidden inside the patient record. */}
+            {selectedPatient && (
+              <p className="mt-1 text-xs text-gray-500">
+                {selectedPatient.weight_kg
+                  ? `Weight ${selectedPatient.weight_kg} kg`
+                  : 'No weight recorded - doses fall back to an age formula'}
+                {selectedPatient.bsa_m2 ? ` \u00b7 BSA ${selectedPatient.bsa_m2} m\u00b2` : ''}
+                {selectedPatient.bmi ? ` \u00b7 BMI ${selectedPatient.bmi}` : ''}
+              </p>
+            )}
           </div>
 
           <div>
@@ -134,6 +161,20 @@ export function DosageCalculator() {
               value={condition}
               onChange={(e) => setCondition(e.target.value)}
               placeholder="e.g., Fever, Headache, Bacterial Infection"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Doses per day (for the daily maximum check)
+            </label>
+            <input
+              type="number"
+              min="1"
+              max="12"
+              value={dosesPerDay}
+              onChange={(e) => setDosesPerDay(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
@@ -219,9 +260,14 @@ export function DosageCalculator() {
             <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
               <TrendingUp className="w-5 h-5" />
               Dosage Information
+              {dosage.is_weight_based && (
+                <span className="flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-700">
+                  <Scale className="h-3 w-3" /> weight-based
+                </span>
+              )}
             </h2>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               <div className="bg-blue-50 p-4 rounded-lg">
                 <p className="text-sm text-gray-600">Dosage amount</p>
                 <p className="text-2xl font-bold text-blue-600">
@@ -243,7 +289,48 @@ export function DosageCalculator() {
                 <p className="text-sm text-gray-600">For Patient Age</p>
                 <p className="text-2xl font-bold text-orange-600">{dosage.patient_age} years</p>
               </div>
+
+              <div className="bg-gray-50 p-4 rounded-lg">
+                <p className="text-sm text-gray-600">Weight</p>
+                <p className="text-2xl font-bold text-gray-700">
+                  {dosage.patient_weight_kg != null
+                    ? `${dosage.patient_weight_kg} kg`
+                    : 'not recorded'}
+                </p>
+              </div>
+
+              {dosage.patient_bsa_m2 != null && (
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <p className="text-sm text-gray-600">Body surface area</p>
+                  <p className="text-2xl font-bold text-gray-700">
+                    {dosage.patient_bsa_m2} m²
+                  </p>
+                </div>
+              )}
             </div>
+
+            {/* The age-band guide is shown alongside a weight-based dose so
+                the coarser figure is visible for comparison, not hidden. */}
+            {dosage.age_band_guide && (
+              <div className="mt-4 rounded border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700">
+                <p className="font-semibold">Stored age-band guide ({dosage.age_band_guide.age_group} years)</p>
+                <p className="mt-1">
+                  {dosage.age_band_guide.dosage_amount} {dosage.age_band_guide.dosage_unit},{' '}
+                  {dosage.age_band_guide.frequency} — a band average that does not
+                  account for this patient’s weight.
+                </p>
+              </div>
+            )}
+
+            {!dosage.is_weight_based && dosage.calculation_method && (
+              <div className="mt-4 flex items-start gap-2 rounded border-l-4 border-yellow-400 bg-yellow-50 p-3 text-sm text-yellow-800">
+                <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+                <p>
+                  This dose is not weight-based. Record the patient’s weight
+                  on their record to enable an mg/kg calculation.
+                </p>
+              </div>
+            )}
 
             {dosage.special_notes && (
               <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded text-yellow-800">
@@ -270,6 +357,112 @@ export function DosageCalculator() {
               </div>
             )}
           </div>
+
+          {/* Weight-based calculation - the arithmetic, shown in full so it
+              can be checked by hand rather than taken on trust. */}
+          {weightDose && (
+            <div className="bg-white rounded-lg shadow p-6">
+              <h2 className="text-xl font-semibold mb-1 flex items-center gap-2">
+                <Scale className="w-5 h-5" />
+                Weight-based calculation
+              </h2>
+              <p className="mb-4 text-sm text-gray-500">
+                {weightDose.is_weight_based
+                  ? 'This dose is calculated from the patient\u2019s body weight.'
+                  : 'No weight-based dose is published for this medicine; the figure below is shown for transparency.'}
+              </p>
+
+              <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+                <div className="rounded-lg bg-gray-50 p-3">
+                  <div className="flex items-center gap-1 text-xs text-gray-500">
+                    <Scale className="h-3 w-3" /> Weight
+                  </div>
+                  <p className="text-lg font-bold text-gray-800">
+                    {weightDose.weight_kg != null ? `${weightDose.weight_kg} kg` : 'not recorded'}
+                  </p>
+                </div>
+                <div className="rounded-lg bg-gray-50 p-3">
+                  <div className="flex items-center gap-1 text-xs text-gray-500">
+                    <Ruler className="h-3 w-3" /> BSA
+                  </div>
+                  <p className="text-lg font-bold text-gray-800">
+                    {weightDose.bsa_m2 != null ? `${weightDose.bsa_m2} m²` : '—'}
+                  </p>
+                </div>
+                <div className="rounded-lg bg-gray-50 p-3">
+                  <p className="text-xs text-gray-500">Age</p>
+                  <p className="text-lg font-bold text-gray-800">
+                    {weightDose.age_months < 24
+                      ? `${weightDose.age_months} months`
+                      : `${weightDose.age_years} years`}
+                  </p>
+                </div>
+                <div className="rounded-lg bg-blue-50 p-3">
+                  <p className="text-xs text-gray-500">Single dose</p>
+                  <p className="text-lg font-bold text-blue-700">
+                    {weightDose.dose} {weightDose.unit}
+                  </p>
+                </div>
+              </div>
+
+              {/* The formula, then the arithmetic step by step. */}
+              <div className="rounded-lg border border-gray-200 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Method
+                </p>
+                <p className="font-medium text-gray-800">{weightDose.method}</p>
+                <p className="mt-1 font-mono text-sm text-blue-700">{weightDose.formula}</p>
+
+                <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Working
+                </p>
+                <ol className="mt-1 space-y-1">
+                  {(weightDose.steps || []).map((step, index) => (
+                    <li key={index} className="font-mono text-sm text-gray-700">
+                      {index + 1}. {step}
+                    </li>
+                  ))}
+                </ol>
+
+                <div className="mt-3 flex flex-wrap gap-4 text-sm">
+                  <span className="text-gray-600">
+                    Daily total:{' '}
+                    <strong className="text-gray-800">
+                      {weightDose.daily_total_mg} {weightDose.unit}
+                    </strong>
+                    {weightDose.doses_per_day ? ` (${weightDose.doses_per_day}×/day)` : ''}
+                  </span>
+                  {weightDose.max_single_dose_mg != null && (
+                    <span className="text-gray-600">
+                      Max single dose:{' '}
+                      <strong className="text-gray-800">
+                        {weightDose.max_single_dose_mg} {weightDose.unit}
+                      </strong>
+                    </span>
+                  )}
+                  <span className="text-gray-600">
+                    Confidence: <strong className="text-gray-800">{weightDose.confidence}</strong>
+                  </span>
+                </div>
+
+                {weightDose.capped && (
+                  <p className="mt-3 rounded border-l-4 border-orange-400 bg-orange-50 p-2 text-sm text-orange-800">
+                    Dose capped to stay within:{' '}
+                    {(weightDose.caps_applied || []).join(' and ')}.
+                  </p>
+                )}
+
+                {(weightDose.warnings || []).map((warning, index) => (
+                  <p
+                    key={index}
+                    className="mt-2 rounded border-l-4 border-yellow-400 bg-yellow-50 p-2 text-sm text-yellow-800"
+                  >
+                    {warning}
+                  </p>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Total Dosage */}
           {totalDosage && (

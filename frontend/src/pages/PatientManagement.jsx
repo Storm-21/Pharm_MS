@@ -25,12 +25,66 @@ const EMPTY_PATIENT = {
   phone: '',
   date_of_birth: '',
   gender: 'Male',
+  // Clinical measurements. Weight is what makes the dosage calculator
+  // weight-based rather than an age-based estimate, so it is captured on the
+  // form instead of being left to an optional API field.
+  weight_kg: '',
+  height_cm: '',
+  serum_creatinine: '',
+  hepatic_impairment: false,
+  renal_impairment: false,
+  is_pregnant: false,
+  pregnancy_trimester: '',
+  is_breastfeeding: false,
   chronic_diseases: '',
   current_medications: '',
   allergies_description: '',
   address: '',
   city: '',
   country: '',
+};
+
+// The server only accepts these keys. Sending computed fields (age, egfr,
+// bsa_m2) back is what used to make every edit fail with
+// "property 'age' of 'Patient' object has no setter".
+const PATIENT_FIELDS = Object.keys(EMPTY_PATIENT);
+
+/** Strip a patient record down to the fields the API accepts. */
+const toFormValues = (patient = {}) => {
+  const values = { ...EMPTY_PATIENT };
+  PATIENT_FIELDS.forEach((key) => {
+    const value = patient[key];
+    if (value === undefined || value === null) return;
+    values[key] = typeof value === 'boolean' ? value : value;
+  });
+  // Empty strings are sent as null so the server stores "not recorded"
+  // rather than an empty string that reads as zero to a numeric parse.
+  return values;
+};
+
+/** Build the JSON body: numbers as numbers, blanks as null. */
+const toPayload = (form) => {
+  const payload = {};
+  PATIENT_FIELDS.forEach((key) => {
+    const value = form[key];
+    if (typeof value === 'boolean') {
+      payload[key] = value;
+    } else if (value === '' || value === undefined || value === null) {
+      payload[key] = null;
+    } else {
+      payload[key] = value;
+    }
+  });
+  // Trim the free-text fields the server requires to be non-empty.
+  ['first_name', 'last_name', 'gender', 'date_of_birth', 'email', 'phone'].forEach((key) => {
+    if (typeof payload[key] === 'string') payload[key] = payload[key].trim();
+  });
+  // Drop nulls for fields the API expects to be present, so a cleared name
+  // is reported as missing rather than sent as null.
+  ['first_name', 'last_name', 'gender', 'date_of_birth'].forEach((key) => {
+    if (payload[key] === null) payload[key] = '';
+  });
+  return payload;
 };
 
 /**
@@ -99,18 +153,29 @@ export function PatientManagement() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
+    setError(null);
     try {
+      const payload = toPayload(formData);
       if (editingId) {
-        await apiClient.updatePatient(editingId, formData);
+        await apiClient.updatePatient(editingId, payload);
       } else {
-        await apiClient.createPatient(formData);
+        await apiClient.createPatient(payload);
       }
       setShowModal(false);
       setEditingId(null);
       setFormData(EMPTY_PATIENT);
       await fetchPatients();
+      if (profile && editingId && profile.patient.id === editingId) {
+        await openProfile(editingId);
+      }
     } catch (err) {
-      setError('Could not save the patient record.');
+      // Surface the server's own message ("A patient with the email ... already
+      // exists", "weight_kg must be a number") instead of a generic sentence,
+      // so the person filling the form knows what to correct.
+      setError(
+        (err && err.message) ||
+          'Could not save the patient record. Check the required fields.'
+      );
     } finally {
       setSaving(false);
     }
@@ -220,6 +285,7 @@ export function PatientManagement() {
                   </h3>
                   <p className="text-sm text-gray-500">
                     {patient.age} yrs &middot; {patient.gender}
+                    {patient.weight_kg ? ` \u00b7 ${patient.weight_kg} kg` : ''}
                   </p>
                 </div>
                 {patient.allergies && patient.allergies.length > 0 && (
@@ -269,7 +335,7 @@ export function PatientManagement() {
                 <button
                   onClick={() => {
                     setEditingId(patient.id);
-                    setFormData({ ...EMPTY_PATIENT, ...patient });
+                    setFormData(toFormValues(patient));
                     setShowModal(true);
                   }}
                   className="flex flex-1 items-center justify-center gap-1 rounded bg-green-50 px-3 py-2 text-sm text-green-700 hover:bg-green-100"
@@ -316,8 +382,17 @@ export function PatientManagement() {
                   </h3>
                   <p className="mt-1 text-sm text-gray-600">
                     {profile.patient.age} yrs &middot; {profile.patient.gender}
+                    {profile.patient.weight_kg ? ` \u00b7 ${profile.patient.weight_kg} kg` : ''}
+                    {profile.patient.bmi ? ` \u00b7 BMI ${profile.patient.bmi}` : ''}
                     {profile.patient.city ? ` \u00b7 ${profile.patient.city}` : ''}
                   </p>
+                  {!profile.patient.weight_kg && (
+                    <p className="mt-2 rounded border-l-4 border-yellow-400 bg-yellow-50 p-2 text-xs text-yellow-800">
+                      No weight recorded. Dosages for this patient fall back to an
+                      age-based estimate - add the weight above for an accurate
+                      mg/kg dose.
+                    </p>
+                  )}
                   <div className="mt-3 flex-wrap gap-4 text-sm text-gray-600">
                     {profile.patient.phone && (
                       <span className="flex items-center gap-1">
@@ -531,7 +606,7 @@ export function PatientManagement() {
                   <button
                     onClick={() => {
                       setEditingId(profile.patient.id);
-                      setFormData({ ...EMPTY_PATIENT, ...profile.patient });
+                      setFormData(toFormValues(profile.patient));
                       setShowModal(true);
                     }}
                     className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
@@ -597,6 +672,108 @@ export function PatientManagement() {
                   </select>
                 </div>
               </div>
+
+              {/* --- Body measurements -------------------------------------
+                  Weight is the single most important field for safe dosing:
+                  every paediatric mg/kg calculation needs it, and without it
+                  the calculator can only fall back to an age formula. It is
+                  therefore on the form rather than hidden in the API. */}
+              <fieldset className="rounded-lg border border-blue-100 bg-blue-50/50 p-4">
+                <legend className="px-1 text-sm font-semibold text-gray-800">
+                  Body measurements (used for dosage calculation)
+                </legend>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-700">
+                      Weight (kg)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="0.1"
+                      value={formData.weight_kg}
+                      onChange={(e) => setFormData({ ...formData, weight_kg: e.target.value })}
+                      placeholder="e.g. 24.5"
+                      className="w-full rounded-lg border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">
+                      Required for a weight-based (mg/kg) paediatric dose.
+                    </p>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-700">
+                      Height (cm)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="1"
+                      value={formData.height_cm}
+                      onChange={(e) => setFormData({ ...formData, height_cm: e.target.value })}
+                      placeholder="e.g. 132"
+                      className="w-full rounded-lg border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">Used for body surface area and BMI.</p>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-700">
+                      Serum creatinine (mg/dL)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0.01"
+                      value={formData.serum_creatinine}
+                      onChange={(e) => setFormData({ ...formData, serum_creatinine: e.target.value })}
+                      placeholder="e.g. 0.9"
+                      className="w-full rounded-lg border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <p className="mt-1 text-xs text-gray-500">Enables eGFR and renal dose checks.</p>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-sm font-medium text-gray-700">
+                      Pregnancy trimester
+                    </label>
+                    <select
+                      value={formData.pregnancy_trimester}
+                      onChange={(e) =>
+                        setFormData({ ...formData, pregnancy_trimester: e.target.value })
+                      }
+                      disabled={!formData.is_pregnant}
+                      className="w-full rounded-lg border-gray-300 px-3 py-2 disabled:bg-gray-100 disabled:text-gray-400"
+                    >
+                      <option value="">Not applicable</option>
+                      <option value="1">1st trimester</option>
+                      <option value="2">2nd trimester</option>
+                      <option value="3">3rd trimester</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4">
+                  {[
+                    { key: 'hepatic_impairment', label: 'Hepatic impairment' },
+                    { key: 'renal_impairment', label: 'Renal impairment' },
+                    { key: 'is_pregnant', label: 'Pregnant' },
+                    { key: 'is_breastfeeding', label: 'Breastfeeding' },
+                  ].map((flag) => (
+                    <label
+                      key={flag.key}
+                      className="flex items-center gap-2 rounded border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={Boolean(formData[flag.key])}
+                        onChange={(e) =>
+                          setFormData({ ...formData, [flag.key]: e.target.checked })
+                        }
+                        className="h-4 w-4 rounded border-gray-300"
+                      />
+                      {flag.label}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
 
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">

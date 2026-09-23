@@ -29,9 +29,23 @@ async function request(path, options = {}) {
     payload = null;
   }
 
-  if (!response.ok && !(payload && payload.error)) {
-    throw new Error(`Request failed (${response.status})`);
+  // A failed request MUST reject. The old check was
+  //     if (!response.ok && !(payload && payload.error)) throw ...
+  // so any error response that carried an `error` field - which is every 400
+  // the API returns - was treated as success. The caller then stored null as
+  // its result and the UI closed the form as if the save had worked, while the
+  // server had rejected it. Reject with the server's own message instead, so
+  // "A patient with the email ... already exists" reaches the screen.
+  if (!response.ok) {
+    const message =
+      (payload && (payload.error || payload.message)) ||
+      `Request failed (${response.status})`;
+    const error = new Error(message);
+    error.status = response.status;
+    error.payload = payload;
+    throw error;
   }
+
   return payload;
 }
 
@@ -121,6 +135,20 @@ export const apiClient = {
       }),
     }),
   getDrugCycle: (medicineId) => request(`/recommender/drug-cycle/${medicineId}`),
+  // Full weight-based calculation: formula, inputs, arithmetic and result.
+  calculateWeightDose: (patientId, medicineId, options = {}) =>
+    request('/recommender/weight-dose', {
+      method: 'POST',
+      body: JSON.stringify({
+        patient_id: patientId,
+        medicine_id: medicineId,
+        doses_per_day: options.dosesPerDay,
+        mg_per_kg: options.mgPerKg,
+        adult_mg: options.adultMg,
+        max_mg: options.maxMg,
+        dose_per_m2: options.dosePerM2,
+      }),
+    }),
   checkAllergies: (patientId, medicineId) =>
     request('/recommender/check-allergies', {
       method: 'POST',

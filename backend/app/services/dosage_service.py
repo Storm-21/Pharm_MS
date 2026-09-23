@@ -72,38 +72,114 @@ class DosageCalculator:
     @staticmethod
     def calculate_dosage(medicine_id, patient_id, condition=None):
         """
-        Calculate dosage for a patient based on their age and condition
-        Returns dosage amount, frequency, and duration
+        Calculate a dose for a patient.
+
+        Order of preference:
+
+          1. Weight-based (mg/kg) - when the medicine has a published per-kg
+             figure and the patient's weight is on file. This is the actual
+             basis of paediatric prescribing and is more precise than any age
+             band: a 24 kg and a 34 kg eight-year-old are not the same patient,
+             but an age table doses them identically.
+          2. The stored age-band DosageGuide, when there is no weight to work
+             from.
+          3. The reference-dose fallback in calculate_default_dosage().
+
+        Whichever route is used is named in the result, and the age-band dose
+        is returned alongside a weight-based one so the two can be compared.
         """
         patient = Patient.query.get(patient_id)
         medicine = Medicine.query.get(medicine_id)
-        
+
         if not patient or not medicine:
             return None
-        
+
         # Get dosage guide for patient's age group
         age_group = DosageCalculator.get_age_group(patient.age)
         dosage_guide = DosageGuide.query.filter_by(
             medicine_id=medicine_id,
             age_group=age_group
         ).first()
-        
+
+        guide_snapshot = None
+        if dosage_guide:
+            guide_snapshot = {
+                'age_group': dosage_guide.age_group,
+                'dosage_amount': dosage_guide.dosage_amount,
+                'dosage_unit': dosage_guide.dosage_unit,
+                'frequency': dosage_guide.frequency,
+                'duration_days': dosage_guide.duration_days,
+            }
+
+        # --- Weight-based takes precedence over the age band -----------------
+        reference = ADULT_REFERENCE_DOSE.get(
+            (medicine.generic_name or '').strip().lower())
+        has_mg_per_kg = bool(reference and reference.get('mg_per_kg'))
+
+        if patient.weight_kg and has_mg_per_kg and patient.age < 18:
+            weight_based = DosageCalculator.calculate_default_dosage(
+                medicine, patient, condition)
+            if weight_based:
+                weight_based['dose_source'] = 'weight-based'
+                if guide_snapshot:
+                    # The age band is coarser by construction, so it is kept as
+                    # a visible comparison rather than a disagreement to hide.
+                    weight_based['age_band_guide'] = guide_snapshot
+                    if (guide_snapshot['dosage_amount']
+                            and abs(guide_snapshot['dosage_amount']
+                                    - weight_based['dosage_amount'])
+                            > 0.05 * guide_snapshot['dosage_amount']):
+                        weight_based['special_notes'] = (
+                            (weight_based.get('special_notes') or '')
+                            + ' The stored age-band guide for %s is %s %s; the '
+                              'weight-based figure above is more precise for '
+                              'this patient.'
+                            % (guide_snapshot['age_group'],
+                               _fmt_mg(guide_snapshot['dosage_amount']),
+                               guide_snapshot['dosage_unit'])
+                        ).strip()
+                return weight_based
+
         if not dosage_guide:
-            # If no specific guide, calculate based on standard pediatric/adult dose
-            return DosageCalculator.calculate_default_dosage(medicine, patient, condition)
-        
-        return {
+            # If no specific guide and no weight to use, fall back to the
+            # reference-dose estimate.
+            result = DosageCalculator.calculate_default_dosage(
+                medicine, patient, condition)
+            if result:
+                result['dose_source'] = 'reference-estimate'
+            return result
+
+        result = {
             'medicine_id': medicine_id,
             'medicine_name': medicine.name,
             'patient_id': patient_id,
             'patient_age': patient.age,
+            'patient_weight_kg': patient.weight_kg,
+            'patient_height_cm': patient.height_cm,
+            'patient_bsa_m2': patient.bsa_m2,
             'dosage_amount': dosage_guide.dosage_amount,
             'dosage_unit': dosage_guide.dosage_unit,
             'frequency': dosage_guide.frequency,
             'duration_days': dosage_guide.duration_days,
             'special_notes': dosage_guide.special_notes,
             'indication': dosage_guide.indication,
+            'calculation_method': 'Stored age-band guide (%s years)'
+                                  % dosage_guide.age_group,
+            'confidence': 'documented',
+            'is_weight_based': False,
+            'dose_source': 'age-band-guide',
+            'source': 'Dosage guide stored for the %s age band'
+                      % dosage_guide.age_group,
         }
+        if not patient.weight_kg and has_mg_per_kg:
+            # The guide is being used only because no weight is on file. Said
+            # plainly, so nobody mistakes this for a weight-based dose.
+            result['special_notes'] = (
+                (result['special_notes'] or '')
+                + ' No weight is recorded for this patient, so the age-band dose '
+                  'was used. Recording the weight enables a weight-based dose.'
+            ).strip()
+        return result
     
     @staticmethod
     def get_age_group(age):
@@ -153,6 +229,90 @@ class DosageCalculator:
 
         caveats = []
 
+        # Frequency first, so the daily ceiling can be applied inside the
+        # weight-based calculation rather than patched on afterwards.
+        if patient.age < 1:
+            frequency = 'Every 6-8 hours as needed'
+            doses_per_day = 4
+        elif patient.age < 12:
+            frequency = '3 times a day'
+            doses_per_day = 3
+        else:
+            frequency = '2-3 times a day'
+            doses_per_day = 3
+
+        # Daily ceiling from the safety engine, used by the weight-based route
+        # so a mg/kg figure cannot produce an over-limit daily total.
+        daily_ceiling = None
+        try:
+            from app.services.safety_service import SafetyEngine
+            daily_ceiling = SafetyEngine.max_daily_dose(medicine)
+        except Exception:
+            daily_ceiling = None
+
+        # --- Weight-based route ---------------------------------------------
+        # The single most important calculation in the application. Where a
+        # published mg/kg figure exists AND a weight is on file, the dose is
+        # weight-based; this is how paediatric prescribing actually works. The
+        # remaining age-formula branches are only fallbacks.
+        if patient.age < 18 and patient.weight_kg and (mg_per_kg or base_dose):
+            from app.services.weight_dosing_service import WeightDoser
+            weight_result = WeightDoser.calculate(
+                patient,
+                reference,
+                doses_per_day=doses_per_day,
+                max_daily_dose_mg=daily_ceiling,
+            )
+            if weight_result:
+                dose = weight_result['dose']
+                method = weight_result['method']
+                caveats.extend(weight_result['warnings'])
+                steps = weight_result['steps']
+                if weight_result['route'] == 'weight':
+                    caveats.insert(0, 'Dosed on the recorded weight of %s kg.'
+                                   % patient.weight_kg)
+
+                confidence = 'documented' if known_drug else 'low'
+                if not known_drug:
+                    confidence = 'low'
+
+                caveats = [c for c in caveats if c]
+                note = 'Estimated using %s. Verify with a prescriber before use.' % method
+                if caveats:
+                    note = note + ' + ' + ' '.join(caveats)
+                if not known_drug:
+                    note += (' No reference dose on file for this medicine, so a '
+                             'generic baseline was used.')
+
+                result = {
+                    'medicine_id': medicine.id,
+                    'medicine_name': medicine.name,
+                    'patient_id': patient.id,
+                    'patient_age': patient.age,
+                    'patient_weight_kg': patient.weight_kg,
+                    'patient_height_cm': patient.height_cm,
+                    'patient_bsa_m2': patient.bsa_m2,
+                    'dosage_amount': dose,
+                    'dosage_unit': 'mg',
+                    'frequency': frequency,
+                    'duration_days': 5,
+                    'special_notes': note,
+                    'indication': condition or 'General use',
+                    'calculation_method': method,
+                    'formula': weight_result['formula'],
+                    'calculation_steps': steps,
+                    'confidence': confidence,
+                    'is_weight_based': weight_result['is_weight_based'],
+                    'dose_capped': weight_result['capped'],
+                    'caps_applied': weight_result['caps_applied'],
+                    'caveats': caveats,
+                    'daily_total_mg': weight_result['daily_total_mg'],
+                    'max_single_dose_mg': weight_result['max_single_dose_mg'],
+                    'max_daily_dose_mg': weight_result['max_daily_dose_mg'],
+                    'source': 'Weight-based calculation from the recorded weight',
+                }
+                return result
+
         if patient.age >= 18:
             dose = base_dose
             method = 'Adult reference dose'
@@ -192,16 +352,6 @@ class DosageCalculator:
                            % _fmt_mg(max_single))
 
         dose = round(dose, 3) if dose < 1 else round(dose, 2)
-
-        if patient.age < 1:
-            frequency = 'Every 6-8 hours as needed'
-            doses_per_day = 4
-        elif patient.age < 12:
-            frequency = '3 times a day'
-            doses_per_day = 3
-        else:
-            frequency = '2-3 times a day'
-            doses_per_day = 3
 
         # Verify the resulting daily total against the ceiling. This is the one
         # arithmetic error that actually harms people, so it is checked rather
@@ -243,6 +393,8 @@ class DosageCalculator:
             'patient_id': patient.id,
             'patient_age': patient.age,
             'patient_weight_kg': patient.weight_kg,
+            'patient_height_cm': patient.height_cm,
+            'patient_bsa_m2': patient.bsa_m2,
             'dosage_amount': dose,
             'dosage_unit': 'mg',
             'frequency': frequency,
@@ -251,6 +403,7 @@ class DosageCalculator:
             'indication': condition or 'General use',
             'calculation_method': method,
             'confidence': confidence,
+            'is_weight_based': False,
             'dose_capped': capped,
             'caveats': caveats,
             'daily_total_mg': round(dose * doses_per_day, 2),

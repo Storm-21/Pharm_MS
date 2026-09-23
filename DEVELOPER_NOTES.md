@@ -85,6 +85,35 @@ app never touches your data — the installer asks before deleting records, and
 `-KeepData` skips the question entirely.
 
 ### New in this revision
+**Weight-based dosing.** The patient record now captures **weight** (kg), height
+(cm), serum creatinine, and the hepatic/renal/pregnancy flags, and the dosage
+calculator uses them. Where a published mg/kg figure exists and a weight is on
+file, the dose is calculated as `mg/kg × weight` — the actual basis of
+paediatric prescribing — instead of falling back to a coarse age band.
+
+Every result shows its working: the method, the formula
+(`15 mg/kg × 27.5 kg`), the arithmetic step by step, the daily total against the
+maximum daily dose, and whether a ceiling was applied. When the stored age-band
+guide disagrees, both figures are shown so the difference is visible rather than
+hidden. A missing weight is never silently assumed — the app says so and falls
+back to an age formula, labelled as such.
+
+Formulas implemented (each a published one, in
+`backend/app/services/weight_dosing_service.py`):
+
+| Method | Formula | When it is used |
+|---|---|---|
+| mg/kg | `dose = mg_per_kg × weight_kg` | Preferred whenever a per-kg figure and a weight exist |
+| BSA (Mosteller) | `BSA = √(height_cm × weight_kg / 3600)` | Per-m² medicines; opt-in |
+| Clark's rule | `dose = adult_dose × (weight_lb / 150)` | No mg/kg figure, but a weight is recorded |
+| Young's rule | `dose = adult_dose × age / (age + 12)` | Last resort — no weight on file |
+
+Verified by `backend/test_weight_dosing.py` (17 tests), which checks each
+formula against a hand-worked value and asserts the safety properties: a
+missing weight is never assumed, no dose below zero is ever emitted,
+sub-milligram precision survives rounding, and both the single-dose and daily
+ceilings are enforced.
+
 **Local data storage with backups.** A *Data & backups* page shows exactly where
 `pharmacy.db` lives, and offers snapshot, export, import and restore. A snapshot
 is taken automatically on every startup and the last 10 are kept, so an
@@ -115,6 +144,29 @@ antivirals and artemisinin combination therapy — with 69 dosage guides.
 flexible column-name mapping. See *Expanding the catalogue* below.
 
 ### Bugs fixed
+#### v2.1 — dosing and patient records
+9. **Adding or editing a patient failed.** The edit form was populated by
+   spreading the whole record returned by the API over a blank form, so it sent
+   back computed, read-only fields — `age`, `egfr`, `ckd_stage`, `bsa_m2`,
+   `age_months`, `allergies`. The update loop was
+   `if hasattr(patient, key): setattr(patient, key, value)`, and `hasattr` is
+   true for a `@property`, so `setattr` ran and raised
+   *"property 'age' of 'Patient' object has no setter"*. The whole request
+   400'd. Both the create and update paths now write only whitelisted,
+   writable columns, with type conversion and a clear message per failure
+   ("A patient with the email … already exists", "weight_kg must be a number").
+10. **A rejected save looked like a success.** The API client only threw when a
+    failed response carried *no* `error` field — so every 400 the API returns
+    was treated as success. The form closed as if the record had saved while
+    the server had rejected it. It now rejects with the server's own message,
+    so the reason is on screen.
+11. **A new schema column could be silently skipped on an existing database.**
+    The migration's fast path probed only the *last* entry in `ADDED_COLUMNS`.
+    Adding a column anywhere earlier in the list left the probe reporting
+    "already migrated", so the column was never created and the app failed at
+    the first query. The probe now checks every entry.
+
+#### Earlier fixes
 
 These were real defects, not refactors:
 
@@ -264,7 +316,8 @@ PharmacyMS/
 | GET | `/api/inventory/summary` | Stock counts and valuation |
 | GET | `/api/inventory/alerts` | Low-stock, out-of-stock and expiry alerts |
 | POST | `/api/recommender/safety-screen` | Combined allergy/contraindication/interaction/stock verdict |
-| POST | `/api/recommender/dosage` | Age-appropriate dose calculation |
+| POST | `/api/recommender/dosage` | Weight-based / age-appropriate dose calculation |
+| POST | `/api/recommender/weight-dose` | Full weight-based working: formula, steps, caps |
 | POST | `/api/recommender/recommend-medicines` | Screened recommendations |
 | GET | `/api/security/branding` | Creator attribution + identity status |
 | GET | `/api/security/verify` | Full integrity report for all records |
@@ -350,6 +403,23 @@ as INTACT.
 I deliberately did not generate entries to pad the count. Inventing dosages,
 formulas and risk data for a medicine would be fabricating clinical information,
 which is the one thing this project will not do.
+
+---
+
+## Running the tests
+
+```powershell
+cd backend
+.\venv\Scripts\python.exe test_weight_dosing.py   # dosing formulas (17 tests)
+.\venv\Scripts\python.exe test_safety.py          # safety engine (26 tests)
+.\venv\Scripts\python.exe test_migration.py       # schema migration
+.\venv\Scripts\python.exe test_endpoints.py       # every API route (58 checks)
+```
+
+`test_endpoints.py` drives every registered endpoint against a throwaway
+database, so it catches the class of defect that is invisible from the UI — a
+route that 500s, or one that answers `success: false` and is ignored by its
+caller. It exits non-zero on any failure.
 
 ---
 

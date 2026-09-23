@@ -63,6 +63,91 @@ def calculate_total_dosage():
             'error': str(e)
         }), 400
 
+@recommender_bp.route('/weight-dose', methods=['POST'])
+def weight_dose():
+    """
+    Show the weight-based dose calculation in full for a patient/medicine pair.
+
+    The calculator's job is to be checkable, not just correct. This endpoint
+    returns the formula, the inputs, the arithmetic steps and the result, so a
+    pharmacist can see 15 mg/kg x 24.5 kg = 367.5 mg on screen and verify it,
+    rather than being asked to trust a single number.
+
+    Body:
+        patient_id          required
+        medicine_id         optional - used to find a mg/kg reference dose
+        mg_per_kg           explicit per-kilogram figure (overrides the table)
+        adult_mg            explicit adult dose for the Clark/Young fallbacks
+        max_mg              explicit single-dose ceiling
+        dose_per_m2         explicit per-m2 figure to force the BSA route
+        doses_per_day       used for the daily ceiling check
+    """
+    try:
+        from app.services.weight_dosing_service import WeightDoser
+        data = request.get_json() or {}
+
+        patient = Patient.query.get(data.get('patient_id'))
+        if not patient:
+            return jsonify({'success': False,
+                            'error': 'Patient not found.'}), 404
+
+        reference = {}
+        medicine = None
+        if data.get('medicine_id'):
+            medicine = Medicine.query.get(data.get('medicine_id'))
+            if not medicine:
+                return jsonify({'success': False,
+                                'error': 'Medicine not found.'}), 404
+            from app.services.dosage_service import ADULT_REFERENCE_DOSE
+            key = (medicine.generic_name or '').strip().lower()
+            reference = dict(ADULT_REFERENCE_DOSE.get(key) or {})
+
+        # Explicit values from the request win over the built-in table, so a
+        # prescriber who knows the local dose is not overridden by our data.
+        for field in ('mg_per_kg', 'adult_mg', 'max_mg', 'dose_per_m2'):
+            if data.get(field) not in (None, ''):
+                reference[field] = float(data[field])
+
+        if not reference:
+            return jsonify({
+                'success': False,
+                'error': ('No reference dose is available for this medicine. '
+                          'Supply mg_per_kg or adult_mg explicitly.'),
+            }), 400
+
+        doses_per_day = int(data.get('doses_per_day') or 1)
+        daily_ceiling = None
+        if medicine:
+            try:
+                from app.services.safety_service import SafetyEngine
+                daily_ceiling = SafetyEngine.max_daily_dose(medicine)
+            except Exception:
+                daily_ceiling = None
+
+        result = WeightDoser.calculate(
+            patient,
+            reference,
+            medicine=medicine,
+            prefer_bsa=bool(reference.get('dose_per_m2')),
+            bsa_dose_per_m2=reference.get('dose_per_m2'),
+            doses_per_day=doses_per_day,
+            max_daily_dose_mg=daily_ceiling,
+        )
+        if not result:
+            return jsonify({
+                'success': False,
+                'error': 'A weight-based dose could not be calculated.',
+            }), 400
+
+        result['medicine_name'] = medicine.name if medicine else None
+        result['patient_name'] = '%s %s' % (patient.first_name, patient.last_name)
+        result['summary'] = WeightDoser.describe(result)
+        return jsonify({'success': True, 'data': result})
+
+    except Exception as exc:
+        return jsonify({'success': False, 'error': str(exc)}), 400
+
+
 @recommender_bp.route('/drug-cycle/<int:medicine_id>', methods=['GET'])
 def get_drug_cycle(medicine_id):
     """Get drug cycle information"""

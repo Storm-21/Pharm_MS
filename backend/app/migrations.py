@@ -33,6 +33,7 @@ import sqlalchemy
 ADDED_COLUMNS = [
     # Patient clinical measurements, needed for weight-based and renal dosing.
     ('patients', 'weight_kg', 'FLOAT'),
+    ('patients', 'height_cm', 'FLOAT'),
     ('patients', 'serum_creatinine', 'FLOAT'),
     ('patients', 'hepatic_impairment', 'BOOLEAN'),
     ('patients', 'renal_impairment', 'BOOLEAN'),
@@ -87,6 +88,29 @@ def _table_exists(connection, table):
     return row is not None
 
 
+def _all_columns_present(database_path):
+    """True only when every (table, column) in ADDED_COLUMNS already exists.
+
+    A table that is absent counts as NOT migrated, so a brand-new database
+    still runs the full path (where the table check safely skips it).
+    """
+    import sqlite3
+    probe = sqlite3.connect(database_path, timeout=15)
+    try:
+        present = {}
+        for table, column, _type in ADDED_COLUMNS:
+            if table not in present:
+                rows = probe.execute('PRAGMA table_info(%s)' % table).fetchall()
+                # An empty result means either "no such table" or "table with
+                # no columns" - both mean there is nothing to skip.
+                present[table] = {row[1] for row in rows}
+            if column not in present[table]:
+                return False
+        return True
+    finally:
+        probe.close()
+
+
 def apply_migrations(db, logger=None):
     """
     Add any missing columns. Safe to call on every startup.
@@ -97,30 +121,25 @@ def apply_migrations(db, logger=None):
     engine = db.engine
     # --- Fast path ---------------------------------------------------------
     # Every startup calls this, so once the schema is current the work should
-    # be skipped cheaply. The probe reads the LAST column in the list from the
-    # real database: if it is present, the migration completed in full on a
-    # previous run.
+    # be skipped cheaply.
     #
-    # This must reflect the live schema, NOT SQLAlchemy's model metadata. An
-    # earlier version used sqlalchemy.inspect(engine), which consults the
-    # model definition - and the model always declares these columns, so the
-    # probe concluded the work was already done and returned immediately. The
-    # migration then silently did nothing on every database, while reporting
-    # success. PRAGMA reads the actual file, which is the only thing that can
-    # tell whether an upgrade is genuinely needed.
-    last_table, last_column, _type = ADDED_COLUMNS[-1]
+    # The probe reads the REAL schema, NOT SQLAlchemy's model metadata. An
+    # earlier version used sqlalchemy.inspect(engine), which consults the model
+    # definition - and the model always declares these columns, so the probe
+    # concluded the work was already done and returned immediately.
+    #
+    # It also checks EVERY entry rather than only the last one. Probing just
+    # the final column is wrong: when a new column is inserted into the middle
+    # of ADDED_COLUMNS, the last column is still present in an already-migrated
+    # database, so the probe reported "nothing to do" and the new column was
+    # never created - the app then failed at the first query with
+    # "table patients has no column named height_cm". Checking all of them is
+    # still cheap (a handful of PRAGMA reads) and cannot miss an insertion.
     try:
         import sqlite3
         probe_path = _database_path(engine)
-        if probe_path:
-            probe = sqlite3.connect(probe_path, timeout=15)
-            try:
-                rows = probe.execute(
-                    'PRAGMA table_info(%s)' % last_table).fetchall()
-                if last_column in {row[1] for row in rows}:
-                    return []
-            finally:
-                probe.close()
+        if probe_path and _all_columns_present(probe_path):
+            return []
     except Exception:
         # If the probe cannot run, fall through to the full migration rather
         # than skipping it on a guess.

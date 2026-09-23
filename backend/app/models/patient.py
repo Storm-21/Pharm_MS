@@ -22,6 +22,10 @@ class Patient(db.Model):
     # cannot be called "weight-based" without it. Stored in kilograms; the
     # app never guesses a value it does not have.
     weight_kg = db.Column(db.Float, nullable=True)
+    # Height in cm. Optional, but when supplied it makes BSA (Mosteller) and BMI
+    # exact instead of estimated, and lets mg/m2 chemotherapy-style dosing be
+    # computed properly.
+    height_cm = db.Column(db.Float, nullable=True)
     # Serum creatinine in mg/dL, used to estimate eGFR (CKD-EPI 2021).
     serum_creatinine = db.Column(db.Float, nullable=True)
     # Hepatic impairment flag - many drugs are contraindicated in severe
@@ -71,17 +75,49 @@ class Patient(db.Model):
     def bsa_m2(self):
         """Body surface area in m^2 (Mosteller formula).
 
-        BSA = sqrt(height_cm x weight_kg / 3600). Height is not captured, so
-        this returns None unless a weight is on file; callers must treat a
-        missing BSA as "cannot calculate", never as zero.
+        BSA = sqrt(height_cm x weight_kg / 3600). When no height is recorded an
+        average is assumed so the figure is still usable; callers must label the
+        result as an estimate in that case. Returns None when there is no weight
+        at all - a missing BSA means "cannot calculate", never zero.
         """
         if not self.weight_kg or self.weight_kg <= 0:
             return None
-        # Without a recorded height, fall back to an average adult height so
-        # BSA remains usable; the caller labels the result as an estimate.
-        assumed_height = 165.0 if self.age >= 18 else (100.0 + self.age * 6)
         import math
-        return round(math.sqrt(assumed_height * self.weight_kg / 3600.0), 3)
+        return round(
+            math.sqrt(self.assumed_height_cm * self.weight_kg / 3600.0), 3)
+
+    @property
+    def bmi(self):
+        """Body mass index, or None when weight or height cannot be established.
+
+        BMI is not used for dosing - doses are per kg of body weight - but it is
+        a recognised flag for weight extremes, and an adult at either end of the
+        scale often needs a dose adjusted for actual or ideal body weight rather
+        than the raw number. Reporting it keeps that judgement visible.
+        """
+        if not self.weight_kg or self.weight_kg <= 0:
+            return None
+        height_m = self.assumed_height_cm / 100.0
+        if height_m <= 0:
+            return None
+        return round(self.weight_kg / (height_m ** 2), 1)
+
+    @property
+    def assumed_height_cm(self):
+        """Height in cm - the recorded value when present, else an estimate.
+
+        Height is not captured on the form, so this falls back to an average
+        adult height (or a rough age-based figure for a child) purely so BSA and
+        BMI can be produced. Callers that clinically depend on height must say
+        the value is estimated rather than measured.
+        """
+        if self.height_cm and self.height_cm > 0:
+            return self.height_cm
+        if self.age >= 18:
+            return 165.0
+        # Child height grows roughly linearly with age until the pubertal
+        # spurt; this is a deliberate approximation, flagged as such.
+        return 100.0 + self.age * 6
 
     @property
     def egfr(self):
@@ -138,6 +174,8 @@ class Patient(db.Model):
             'current_medications': self.current_medications,
             'allergies_description': self.allergies_description,
             'weight_kg': self.weight_kg,
+            'height_cm': self.height_cm,
+            'bmi': self.bmi,
             'serum_creatinine': self.serum_creatinine,
             'hepatic_impairment': bool(self.hepatic_impairment),
             'renal_impairment': bool(self.renal_impairment),
