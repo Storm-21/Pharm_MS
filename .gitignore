@@ -23,7 +23,12 @@ frontend/build/
 frontend/public/logo*.png
 frontend/public/logo.svg
 frontend/public/favicon.ico
-backend/pharms.ico
+# backend/pharms.ico is intentionally NOT ignored: it is a source asset, not
+# build output. build_installer.ps1 passes it to csc.exe as /win32icon, so a
+# clone without it cannot build the installer at all. Ignoring it was why every
+# Build installer run on CI failed with
+#     error CS1583: ... pharms.ico is not a valid Win32 resource file
+# while working on the developer's machine, where the file already existed.
 
 # --- Databases: NEVER commit patient data ---
 *.db

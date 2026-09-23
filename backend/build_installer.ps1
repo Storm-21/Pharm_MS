@@ -466,12 +466,24 @@ if (-not (Test-Path $csc)) {
 
 $iconPath = Join-Path $BackendDir 'pharms.ico'
 
+# The icon is a source asset, but a build should not die because one optional
+# decoration is missing - csc.exe rejects a bad or absent path outright with
+# "CS1583: not a valid Win32 resource file", which is a confusing way to be told
+# the icon is simply not there. Warn and build without it instead, so the only
+# consequence of a missing icon is a generic icon on the shortcut.
+$iconArgs = @()
+if (Test-Path $iconPath) {
+    $iconArgs = @("/win32icon:`"$iconPath`"")
+} else {
+    Write-Host "    WARNING: $iconPath not found - building without a custom icon." -ForegroundColor Yellow
+}
+
 Push-Location $BuildStage
 try {
     & $csc /nologo /target:winexe `
         /out:"$OutSetup" `
         /resource:"$SetupPs1",setup.ps1 `
-        /win32icon:"$iconPath" `
+        @iconArgs `
         /reference:System.dll `
         /reference:System.Windows.Forms.dll `
         "$SetupCs"
