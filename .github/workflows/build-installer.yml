@@ -96,11 +96,26 @@ jobs:
           $code = $LASTEXITCODE
           $text = Get-Content build.log -Raw -ErrorAction SilentlyContinue
           if (-not $text) { $text = '(no output captured)' }
-          if ($text.Length -gt 50000) { $text = $text.Substring($text.Length - 50000) }
-          "## Build output (exit $code)`n``text`n$text`n``" | Add-Content $env:GITHUB_STEP_SUMMARY
-          "## Artefacts present`n" + ((Get-ChildItem dist -ErrorAction SilentlyContinue | ForEach-Object { "- $($_.Name) $([math]::Round($_.Length/1MB,1)) MB" }) -join "`n") | Add-Content $env:GITHUB_STEP_SUMMARY
+
+          # Always print the tail to the console, so the failure is in the
+          # default log view rather than hidden in a collapsed summary.
+          Write-Host '================ BUILD OUTPUT (tail) ================'
+          $tail = if ($text.Length -gt 12000) { $text.Substring($text.Length - 12000) } else { $text }
+          Write-Host $tail
+          Write-Host '==================================================='
+
+          # Also emit it as annotations. The annotations API is readable without
+          # authentication, and the logs are not - so this is the only way a
+          # failure can be diagnosed from the command line.
+          foreach ($line in ($text -split "`n")) {
+            $trimmed = $line.TrimEnd()
+            if ($trimmed -match 'ERROR:|error CS\d+|npm ERR|Traceback|No module|not found|Failed|FAILED') {
+              Write-Host "::error::$trimmed"
+            }
+          }
+
           if (-not (Test-Path 'dist/PharmMS-Setup.exe')) {
-            Write-Host '::error::Installer was not produced - see the build output in the job summary.'
+            Write-Host '::error::Installer was not produced.'
             exit 1
           }
 
