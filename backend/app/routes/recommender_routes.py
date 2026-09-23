@@ -683,6 +683,14 @@ def live_reference(drug_name):
     drug fetched before. Only the drug name is ever sent - no patient data
     leaves the machine.
 
+    The response also carries whatever the local formulary already holds for
+    the same ingredient. That matters for an Indian pharmacy: openFDA covers
+    FDA-approved products, so a molecule marketed here but not in the United
+    States simply has no label to fetch. Returning the local monograph alongside
+    means the screen is never empty for a drug the application already knows
+    about, and the pharmacist can see the two side by side rather than being
+    told "not found" about a medicine sitting in their own database.
+
     Returns the monograph plus its source. This is reference material, never a
     recommendation, and it is deliberately not fed into the ranking engine.
     """
@@ -691,14 +699,44 @@ def live_reference(drug_name):
 
         force = request.args.get('refresh') == '1'
         payload, error = LiveReference.fetch_monograph(drug_name, force=force)
+
+        # Whatever is authored locally for this ingredient, matched on the
+        # generic name so a brand search still finds the local row.
+        local = Medicine.query.filter(
+            (Medicine.generic_name.ilike('%' + drug_name + '%'))
+            | (Medicine.name.ilike('%' + drug_name + '%'))
+        ).first()
+        local_summary = None
+        if local:
+            local_summary = {
+                'medicine_id': local.id,
+                'name': local.name,
+                'generic_name': local.generic_name,
+                'use_case': local.use_case,
+                'contraindications': local.contraindications,
+                'warnings': local.warnings,
+                'drug_interactions': local.drug_interactions,
+                'side_effects': local.side_effects,
+                'max_daily_dose': local.max_daily_dose,
+                'schedule_classification': local.schedule_classification,
+            }
+
         if error:
+            # A local monograph is still a genuine answer even when the network
+            # is unreachable, so it is returned with the error rather than
+            # discarded. The caller can show what is known and say the optional
+            # part failed - which is not the same as "no information".
             return jsonify({
                 'success': False,
                 'error': error,
+                'local_monograph': local_summary,
                 'offline_note': ('The application works fully offline. This '
                                  'optional lookup is the only feature that '
                                  'uses the network.'),
             }), 503
+
+        if isinstance(payload, dict):
+            payload['local_monograph'] = local_summary
         return jsonify({'success': True, 'data': payload})
 
     except Exception as exc:

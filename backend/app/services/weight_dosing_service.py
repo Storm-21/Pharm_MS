@@ -158,6 +158,33 @@ class WeightDoser:
 
         bsa_available = bool(weight_kg and patient.bsa_m2)
 
+        # --- Age-based comparison -------------------------------------------
+        # Computed on every call, not only when it is the chosen route. Both
+        # formulas are shown side by side on the dosage panel so the prescriber
+        # can see how far apart they are and judge which suits the patient.
+        # Showing only the winner would hide exactly the disagreement that is
+        # worth knowing about - a 24 kg eight-year-old is dosed 412.5 mg by
+        # weight and 250 mg by the age band, and that gap is the point.
+        age_comparison = None
+        if adult_mg and mg_per_kg and weight_kg:
+            # Only useful when the weight-based route is genuinely available and
+            # therefore differs. With no weight on file the chosen dose IS
+            # Young's rule, so showing the pair would print the same number
+            # twice and imply a comparison that does not exist.
+            age_dose = DosingFormula.youngs_rule(adult_mg, age)
+            age_comparison = {
+                'method': "Young's rule (age-based)",
+                'formula': 'adult dose %s mg x %s / (%s + 12)' % (adult_mg, age, age),
+                'dose': _round_dose(age_dose),
+                'unit': 'mg',
+                'inputs': {'adult_mg': adult_mg, 'age_years': age},
+                'is_weight_based': False,
+                'assumes': 'an average-sized child of this age - it does not use weight',
+            }
+            if max_mg and age_comparison['dose'] > max_mg:
+                age_comparison['dose'] = _round_dose(float(max_mg))
+                age_comparison['capped'] = True
+
         if prefer_bsa and bsa_dose_per_m2 and bsa_available:
             route = 'bsa'
         elif mg_per_kg and weight_kg:
@@ -312,6 +339,27 @@ class WeightDoser:
             'bmi': getattr(patient, 'bmi', None),
             'warnings': warnings,
             'is_weight_based': route in ('weight', 'clark', 'bsa'),
+            # Both methods, so the panel can show them together.
+            'formulas': [
+                {
+                    'method': method,
+                    'formula': formula,
+                    'dose': dose,
+                    'unit': 'mg',
+                    'is_weight_based': route in ('weight', 'clark', 'bsa'),
+                    'selected': True,
+                },
+                dict(age_comparison, selected=False) if age_comparison else None,
+            ] if age_comparison else [
+                {
+                    'method': method,
+                    'formula': formula,
+                    'dose': dose,
+                    'unit': 'mg',
+                    'is_weight_based': route in ('weight', 'clark', 'bsa'),
+                    'selected': True,
+                },
+            ],
         }
 
     @staticmethod

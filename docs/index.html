@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -29,9 +29,11 @@
     <nav class="site-nav">
       <a href="#features">Features</a>
       <a href="#safety">Safety</a>
+      <a href="#dosage">Dosing</a>
       <a href="#screens">Screenshots</a>
+      <a href="#source">Source</a>
       <a href="#faq">FAQ</a>
-      <a class="btn btn-small" href="https://github.com/storm-21/pharms" target="_blank" rel="noopener">
+      <a class="btn btn-small" href="https://github.com/Storm-21/Pharm_MS" target="_blank" rel="noopener">
         GitHub
       </a>
     </nav>
@@ -57,12 +59,11 @@
 
       <div class="cta-row">
         <a class="btn btn-primary btn-large"
-           href="https://github.com/storm-21/pharms/releases/latest/download/PharmMS-Setup.exe">
+           href="https://github.com/Storm-21/Pharm_MS/releases/latest/download/PharmMS-Setup.exe">
           Download for Windows
         </a>
-        <a class="btn btn-ghost btn-large"
-           href="https://github.com/storm-21/pharms" target="_blank" rel="noopener">
-          View source
+        <a class="btn btn-ghost btn-large" href="#source">
+          Request source access
         </a>
       </div>
 
@@ -84,8 +85,8 @@
 <!-- ================================================================ -->
 <section class="strip">
  <div class="wrap strip-inner">
-    <div><strong>81</strong><span>curated medicines</span></div>
-    <div><strong>71</strong><span>therapeutic classes</span></div>
+    <div><strong>116</strong><span>curated medicines</span></div>
+    <div><strong>96</strong><span>therapeutic classes</span></div>
     <div><strong>8</strong><span>safety checks per medicine</span></div>
     <div><strong>0</strong><span>internet requests by default</span></div>
  </div>
@@ -105,11 +106,14 @@
       <article class="card">
         <h3>Medicine database</h3>
         <p>
-          81 medicines across 71 therapeutic classes, each with molecular
+          116 medicines across 96 therapeutic classes, each with molecular
           formula, manufacturer and drug licence number, Indian Pharmacopoeia
           and BP/USP monograph references, mechanism of action,
           pharmacokinetics, pregnancy category, and HSN/GST and schedule
-          classification.
+          classification. Coverage is weighted toward what an Indian community
+          pharmacy actually dispenses - the antitubercular regimen drugs, the
+          artemisinin combinations, ORS and zinc, the anthelmintics, and the
+          fixed-dose combinations Indian general practice prescribes.
         </p>
       </article>
 
@@ -126,10 +130,12 @@
       <article class="card">
         <h3>Weight-based dosing</h3>
         <p>
-          Paediatric doses calculated from published mg/kg figures where they
-          exist, falling back to Young's rule and labelling the confidence
-          honestly. Every result is capped at the maximum single dose, so a
-          heavy child cannot be handed an adult overdose.
+          Four published formulas - mg/kg, body surface area, Clark&rsquo;s rule
+          and Young&rsquo;s rule - chosen by what is actually known about the
+          patient, with the working shown and both methods compared side by side.
+          Every result is capped at the maximum single dose and the maximum daily
+          total, so a heavy child cannot be handed an adult overdose.
+          <a href="#dosage">See the formulas</a>.
         </p>
       </article>
 
@@ -259,6 +265,106 @@
 </section>
 
 <!-- ================================================================ -->
+<!-- Dosing methods                                                  -->
+<!-- ================================================================ -->
+<section id="dosage" class="section">
+ <div class="wrap">
+    <h2>How a dose is worked out</h2>
+    <p class="section-lede">
+      Four published formulas, chosen by what is actually known about the
+      patient - and the working is shown, not hidden.
+    </p>
+
+    <div class="formula-grid">
+      <article class="formula-card formula-primary">
+        <p class="formula-tag">Preferred &middot; weight-based</p>
+        <h3>mg/kg</h3>
+        <p class="formula-eq">dose = mg_per_kg &times; weight_kg</p>
+        <p>
+          The actual basis of paediatric prescribing. Used whenever the medicine
+          has a published per-kilogram figure and a weight is on record - a 24 kg
+          and a 34 kg eight-year-old are not the same patient, and an age table
+          cannot tell them apart.
+        </p>
+        <p class="formula-example">
+          15 mg/kg &times; 27.5 kg = <strong>412.5 mg</strong>
+        </p>
+      </article>
+
+      <article class="formula-card">
+        <p class="formula-tag">Body size</p>
+        <h3>Body surface area</h3>
+        <p class="formula-eq">BSA = &radic;(height_cm &times; weight_kg / 3600)</p>
+        <p>
+          The Mosteller formula, for medicines dosed per square metre -
+          cytotoxics, some biologicals and paediatric infusions.
+        </p>
+        <p class="formula-example">
+          height 132 cm, weight 27.5 kg = <strong>0.949 m&sup2;</strong>
+        </p>
+      </article>
+
+      <article class="formula-card">
+        <p class="formula-tag">Weight fallback</p>
+        <h3>Clark&rsquo;s rule</h3>
+        <p class="formula-eq">dose = adult_dose &times; (weight_lb / 150)</p>
+        <p>
+          Weight-based, for a medicine with no published mg/kg figure. Preferred
+          over an age formula whenever a weight exists.
+        </p>
+        <p class="formula-example">
+          500 mg &times; (60.6 lb / 150) = <strong>202.1 mg</strong>
+        </p>
+      </article>
+
+      <article class="formula-card">
+        <p class="formula-tag">Age fallback</p>
+        <h3>Young&rsquo;s rule</h3>
+        <p class="formula-eq">dose = adult_dose &times; age / (age + 12)</p>
+        <p>
+          The last resort, used only when no weight is on file. It assumes an
+          average-sized child, so it is labelled as the weaker estimate it is -
+          and the app tells you to record the weight instead.
+        </p>
+        <p class="formula-example">
+          500 mg &times; 8 / 20 = <strong>200 mg</strong>
+        </p>
+      </article>
+    </div>
+
+    <div class="formula-notes">
+      <div>
+        <h3>Every result shows its working</h3>
+        <p>
+          The method, the formula with real numbers substituted, each step of the
+          arithmetic, the running daily total against the maximum daily dose, and
+          whether a ceiling was applied. You can check the sum by hand rather
+          than taking it on trust.
+        </p>
+      </div>
+      <div>
+        <h3>A missing weight is never guessed</h3>
+        <p>
+          The software does not assume a 70 kg adult. If a weight is not on
+          record it says so, uses an age estimate, and labels the result as an
+          estimate - and states that recording the weight would give an accurate
+          mg/kg dose instead.
+        </p>
+      </div>
+      <div>
+        <h3>Two ceilings, always applied</h3>
+        <p>
+          mg/kg extrapolates badly in a heavy child: 15 mg/kg for a 45 kg
+          twelve-year-old is 675 mg, more than an adult takes. So each dose is
+          capped at the maximum single dose <em>and</em> the maximum daily total,
+          and both caps are reported.
+        </p>
+      </div>
+    </div>
+ </div>
+</section>
+
+<!-- ================================================================ -->
 <!-- Screenshots                                                     -->
 <!-- ================================================================ -->
 <section id="screens" class="section">
@@ -320,12 +426,12 @@
     </p>
 
     <a class="btn btn-primary btn-large"
-       href="https://github.com/storm-21/pharms/releases/latest/download/PharmMS-Setup.exe">
+       href="https://github.com/Storm-21/Pharm_MS/releases/latest/download/PharmMS-Setup.exe">
       Download PharmMS-Setup.exe
     </a>
 
     <p class="micro">
-      <a href="https://github.com/storm-21/pharms/releases/latest" target="_blank" rel="noopener">All releases and version history</a>
+      <a href="https://github.com/Storm-21/Pharm_MS/releases/latest" target="_blank" rel="noopener">All releases and version history</a>
     </p>
 
     <div class="notice">
@@ -351,6 +457,73 @@
 </section>
 
 <!-- ================================================================ -->
+<!-- Source access                                                   -->
+<!-- ================================================================ -->
+<section id="source" class="section section-tint">
+ <div class="wrap narrow">
+    <h2>Source code access</h2>
+    <p class="section-lede">
+      The source is available to review - on request, and not as a free
+      download.
+    </p>
+
+    <div class="source-panel">
+      <div class="source-state">
+        <span class="pill pill-amber">Access by request</span>
+        <p>
+          PharmMS is released as a <strong>finished application</strong>. The
+          source sits in a private repository and is shared with people who have
+          a specific reason to see it - a pharmacy integrating it, a developer
+          doing due diligence, or a reviewer checking the safety logic.
+        </p>
+      </div>
+
+      <h3>Why not simply public?</h3>
+      <p>
+        A pharmacy system carries clinical safety rules, licence-key handling
+        and a curated drug database. Publishing all of that openly invites
+        silent forks that look authoritative but have had their safety rules
+        changed - which is the one failure mode that could actually reach a
+        patient. Keeping a single maintained copy is a safety decision, not a
+        secrecy one.
+      </p>
+
+      <h3>What you get on request</h3>
+      <ul class="source-list">
+        <li><strong>Read access</strong> to the full repository - Flask API, React interface, dosing engine, safety engine, test suites and the data set.</li>
+        <li><strong>The audit trail</strong> - commit history and the signed integrity seals that let you verify a build has not been altered.</li>
+        <li><strong>A written permission</strong> stating what you may do with it.</li>
+      </ul>
+
+      <h3>How to ask</h3>
+      <ol class="steps">
+        <li>Open an issue on the repository titled <code>Source access request</code>.</li>
+        <li>Say who you are and what you intend to do with the code.</li>
+        <li>You will get a reply with read access, usually within a few days.</li>
+      </ol>
+
+      <div class="cta-row cta-row-center">
+        <a class="btn btn-primary"
+           href="https://github.com/Storm-21/Pharm_MS/issues/new?title=Source%20access%20request"
+           target="_blank" rel="noopener">
+          Request source access
+        </a>
+        <a class="btn btn-ghost"
+           href="https://github.com/Storm-21/Pharm_MS" target="_blank" rel="noopener">
+          Repository on GitHub
+        </a>
+      </div>
+
+      <p class="micro source-fine">
+        Access is granted for reading, evaluation and integration work. It does
+        not transfer ownership, and redistributing a modified copy as PharmMS is
+        not permitted - see the licence for the exact terms.
+      </p>
+    </div>
+ </div>
+</section>
+
+<!-- ================================================================ -->
 <!-- FAQ                                                             -->
 <!-- ================================================================ -->
 <section id="faq" class="section">
@@ -369,9 +542,16 @@
         pulls label data from the FDA's public database. It is <strong>off
         unless you turn it on</strong>, sends nothing but the drug name, caches
         every result so it keeps working offline afterwards, and is never fed
-        into the recommendation engine. If it cannot reach the network it tells
-        you plainly, rather than showing an empty result that looks like "no
-        warnings".
+        into the recommendation engine.
+      </p>
+      <p>
+        It is attached to the medicine you are already looking at, in the
+        medicine record, rather than running behind your back. It also shows
+        whatever the local formulary holds for the same ingredient, so a
+        molecule marketed in India but not in the United States - which has no
+        FDA label to fetch - still returns the local monograph rather than a
+        blank screen. If it cannot reach the network it says so plainly, rather
+        than showing an empty result that looks like &ldquo;no warnings&rdquo;.
       </p>
     </details>
 
@@ -421,17 +601,25 @@
       </p>
     </details>
 
-    <details>
-      <summary>Is the source code available?</summary>
-      <p>
-        Yes -
-        <a href="https://github.com/storm-21/pharms" target="_blank" rel="noopener">github.com/storm-21/pharms</a>.
-        The README covers building from source, the test suites, and adding
-        medicines in bulk from a CDSCO or Jan Aushadhi catalogue.
-      </p>
-    </details>
- </div>
-</section>
+        <details>
+          <summary>Is the source code available?</summary>
+          <p>
+            Yes, on request. The repository is private by default so that a single
+            maintained copy of the clinical safety rules and the drug database stays
+            authoritative. Open an
+            <a href="https://github.com/Storm-21/Pharm_MS/issues/new?title=Source%20access%20request" target="_blank" rel="noopener">access request</a>
+            describing who you are and what you need it for, and you will be given
+            read access and the design notes behind the dosing and safety engines.
+          </p>
+          <p>
+            What you get documented on the way in: the weight-based dosing formulas
+            with their published sources, the eight-step safety gate, the test
+            suites, and how to add medicines in bulk from a CDSCO or Jan Aushadhi
+            catalogue.
+          </p>
+        </details>
+      </div>
+    </section>
 
 </main>
 
@@ -445,9 +633,9 @@
       <p class="micro">Offline pharmacy management for Windows.</p>
     </div>
     <nav class="footer-nav">
-      <a href="https://github.com/storm-21/pharms" target="_blank" rel="noopener">Source code</a>
-      <a href="https://github.com/storm-21/pharms/releases/latest" target="_blank" rel="noopener">Releases</a>
-      <a href="https://github.com/storm-21/pharms/issues" target="_blank" rel="noopener">Report an issue</a>
+      <a href="#source">Source code access</a>
+      <a href="https://github.com/Storm-21/Pharm_MS/releases/latest" target="_blank" rel="noopener">Releases</a>
+      <a href="https://github.com/Storm-21/Pharm_MS/issues" target="_blank" rel="noopener">Report an issue</a>
     </nav>
  </div>
 

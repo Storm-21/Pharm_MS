@@ -12,8 +12,190 @@ import {
   FlaskConical,
   Factory,
   BookOpen,
+  Globe,
+  RefreshCw,
+  WifiOff,
 } from 'lucide-react';
 import { apiClient } from '../api';
+
+/**
+ * Live reference lookup.
+ *
+ * The backend has always exposed /recommender/reference, but nothing in the
+ * interface ever called it, so the feature was unreachable - the workbench even
+ * told the user to "look the drug up in the reference browser", which did not
+ * exist. It is now attached to the medicine it would be looked up for.
+ *
+ * Two deliberate design points:
+ *
+ *  - It is never automatic. Fetching a monograph touches the network, and the
+ *    application's whole premise is that it does not need one. The pharmacist
+ *    clicks, so nothing leaves the machine without a decision to make it leave.
+ *  - Fetched text is shown as reference material and is visibly separated from
+ *    the authored monograph above it. It is not merged into the local record by
+ *    looking at it, and it never feeds the recommender.
+ */
+function LiveReferencePanel({ medicine }) {
+  const [state, setState] = useState('idle'); // idle | loading | done | error
+  const [monograph, setMonograph] = useState(null);
+  const [error, setError] = useState(null);
+
+  const drugName = medicine.generic_name || medicine.name;
+
+  const load = useCallback(
+    async (refresh = false) => {
+      setState('loading');
+      setError(null);
+      try {
+        const response = await apiClient.getLiveReference(drugName, refresh);
+        if (response && response.success) {
+          setMonograph(response.data);
+          setState('done');
+        } else {
+          setError(
+            (response && response.error) || 'The reference lookup returned no data.'
+          );
+          setState('error');
+        }
+      } catch (err) {
+        // The API answers 503 when the network is unreachable and explains that
+        // the rest of the app is unaffected. Show that, not a generic failure.
+        setError(err.message || 'Live lookup unavailable.');
+        setState('error');
+      }
+    },
+    [drugName]
+  );
+
+  const block = (label, value) =>
+    value ? (
+      <div className="mt-3">
+        <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+          {label}
+        </p>
+        <p className="mt-1 whitespace-pre-line text-sm text-gray-700">{value}</p>
+      </div>
+    ) : null;
+
+  return (
+    <div className="mt-6 rounded-lg border border-blue-200 bg-blue-50/40 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h4 className="flex items-center gap-2 font-semibold text-gray-800">
+          <Globe className="h-4 w-4 text-blue-600" />
+          Live reference lookup
+        </h4>
+        {state === 'done' && (
+          <button
+            onClick={() => load(true)}
+            className="flex items-center gap-1 rounded border border-blue-300 bg-white px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-50"
+          >
+            <RefreshCw className="h-3 w-3" /> Refresh
+          </button>
+        )}
+      </div>
+
+      <p className="mt-2 text-sm text-gray-600">
+        Fetches the regulator's product label for{' '}
+        <strong>{drugName}</strong> from the FDA openFDA database. It is{' '}
+        <strong>off unless you ask for it</strong>, sends nothing but the drug
+        name, and caches every result so it keeps working offline afterwards.
+      </p>
+
+      {state === 'idle' && (
+        <button
+          onClick={() => load(false)}
+          className="mt-3 flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+        >
+          <Globe className="h-4 w-4" /> Look up {drugName}
+        </button>
+      )}
+
+      {state === 'loading' && (
+        <p className="mt-3 flex items-center gap-2 text-sm text-gray-600">
+          <Loader2 className="h-4 w-4 animate-spin" /> Fetching label data...
+        </p>
+      )}
+
+      {state === 'error' && (
+        <div className="mt-3 flex items-start gap-2 rounded border-l-4 border-amber-400 bg-amber-50 p-3">
+          <WifiOff className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-600" />
+          <div>
+            <p className="text-sm text-amber-800">{error}</p>
+            <p className="mt-1 text-xs text-amber-700">
+              This is the only feature that uses the network. Everything else,
+              including the local monograph above, works fully offline.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {state === 'done' && monograph && !monograph.found && (
+        <div className="mt-3 rounded border-l-4 border-gray-300 bg-white p-3">
+          <p className="text-sm text-gray-600">
+            No FDA label matching this active ingredient was found. openFDA
+            covers FDA-approved products, so a molecule marketed in India but not
+            in the United States has no label to fetch - that is a gap in the
+            source, not a problem with this medicine.
+          </p>
+          {monograph.local_monograph && (
+            <p className="mt-2 text-sm text-gray-700">
+              The local monograph for{' '}
+              <strong>{monograph.local_monograph.generic_name}</strong> is shown
+              above and remains the authoritative record here.
+            </p>
+          )}
+        </div>
+      )}
+
+      {state === 'done' && monograph && monograph.found && (
+        <div className="mt-3 rounded-lg border border-blue-200 bg-white p-4">
+          <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
+            <span className="rounded bg-blue-100 px-2 py-0.5 font-medium text-blue-700">
+              Reference material - not a recommendation
+            </span>
+            {monograph._from_cache && (
+              <span className="rounded bg-gray-100 px-2 py-0.5">
+                from local cache
+                {monograph._cache_age_days != null
+                  ? ` (${monograph._cache_age_days} days old)`
+                  : ''}
+              </span>
+            )}
+            {monograph.manufacturer && <span>{monograph.manufacturer}</span>}
+          </div>
+
+          {block('Boxed warning', monograph.boxed_warning)}
+          {block('Indications', monograph.indications_and_usage)}
+          {block('Dosage and administration', monograph.dosage_and_administration)}
+          {block('Contraindications', monograph.contraindications)}
+          {block('Warnings', monograph.warnings)}
+          {block('Drug interactions', monograph.drug_interactions)}
+          {block('Adverse reactions', monograph.adverse_reactions)}
+          {block('Paediatric use', monograph.pediatric_use)}
+          {block('Geriatric use', monograph.geriatric_use)}
+
+          <p className="mt-4 border-t pt-3 text-xs text-gray-500">
+            {monograph.disclaimer ||
+              'Reference material only. Verify against the current Indian Pharmacopoeia and the manufacturer labelling.'}
+            {monograph.source_url && (
+              <>
+                {' '}
+                <a
+                  href={monograph.source_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 underline"
+                >
+                  Source
+                </a>
+              </>
+            )}
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
 
 const EMPTY_MEDICINE = {
   name: '',
@@ -217,6 +399,9 @@ function MedicineDetail({ medicine, onClose, onEdit }) {
               </div>
             </Section>
           )}
+
+          {/* Optional live lookup, attached to the medicine being viewed. */}
+          <LiveReferencePanel medicine={medicine} />
         </div>
       </div>
     </div>

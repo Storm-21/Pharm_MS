@@ -575,4 +575,134 @@ details p {
 @media print {
   .site-header, .cta-row, .btn { display: none; }
   body { font-size: 11pt; }
+}/* ======================================================================
+   Formula cards - the four dosing methods.
+
+   Added with the weight-based dosing engine. The first card is visually
+   distinguished because mg/kg is the method actually used in practice and
+   the other three are fallbacks; the page should say so at a glance rather
+   than making the reader work it out.
+   ====================================================================== */
+.formula-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 18px;
+  margin-top: 28px;
+}
+
+.formula-card {
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 22px;
+}
+
+.formula-card h3 {
+  font-size: 18px;
+  margin: 6px 0 10px;
+}
+
+.formula-primary {
+  border-color: var(--brand-light);
+  box-shadow: 0 0 0 1px var(--brand-light) inset;
+}
+
+.formula-tag {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0;
+}
+
+.formula-primary .formula-tag { color: var(--brand-light); }
+
+.formula-eq {
+  font-family: ui-monospace, "SFMono-Regular", "Consolas", monospace;
+  font-size: 14px;
+  background: var(--bg-tint);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin: 0 0 12px;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.formula-card p { color: var(--ink-soft); font-size: 14.5px; }
+
+.formula-example {
+  margin: 14px 0 0;
+  padding-top: 12px;
+  border-top: 1px dashed var(--line);
+  font-family: ui-monospace, "SFMono-Regular", "Consolas", monospace;
+  font-size: 13.5px;
+  color: var(--muted) !important;
+}
+
+.formula-example strong { color: var(--brand); }
+
+.formula-notes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 22px;
+  margin-top: 34px;
+  padding-top: 28px;
+  border-top: 1px solid var(--line);
+}
+
+.formula-notes h3 { font-size: 16px; margin: 0 0 8px; }
+.formula-notes p { color: var(--ink-soft); font-size: 14.5px; margin: 0; }
+
+/* ======================================================================
+   Source-access panel
+   ====================================================================== */
+.source-panel {
+  margin-top: 26px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 28px;
+}
+
+.source-panel h3 { font-size: 16.5px; margin: 26px 0 8px; }
+.source-panel > h3:first-of-type { margin-top: 22px; }
+.source-panel p { color: var(--ink-soft); font-size: 15px; }
+
+.source-state { border-bottom: 1px solid var(--line); padding-bottom: 18px; }
+.source-state p { margin: 12px 0 0; }
+
+.source-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.source-list li {
+  position: relative;
+  padding-left: 26px;
+  color: var(--ink-soft);
+  font-size: 15px;
+}
+
+.source-list li::before {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 8px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--brand-light);
+}
+
+.source-fine { margin-top: 22px; }
+
+.cta-row-center {
+  justify-content: flex-start;
+  margin: 22px 0 0;
 }

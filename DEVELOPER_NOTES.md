@@ -423,6 +423,61 @@ caller. It exits non-zero on any failure.
 
 ---
 
+## Licence and source-access enforcement
+
+PharmMS ships under the proprietary source-available licence in `LICENSE`
+(replaced in v2.1 from Apache 2.0, which permitted exactly the modification and
+redistribution the project does not want).
+
+### The honest limitation
+
+**GitHub cannot make a repository readable but not downloadable.** There is no
+setting for it. A public repository can be viewed *and* cloned by anyone via the
+web UI, `git clone`, the API, or a mirror, and making the repository private
+removes the reading too. So the choice is binary:
+
+| Repository | Can be read | Can be copied/modified |
+|---|---|---|
+| Public | Yes, by anyone | **Yes, by anyone** |
+| Private | Only invited collaborators | Only invited collaborators |
+
+The licence text is a *legal* control, not a technical one. It states plainly
+what is and is not permitted, it terminates automatically on breach, and it is
+enforceable — but it cannot stop a determined person from copying a public
+repository. Anyone claiming otherwise is selling something.
+
+### Recommended configuration
+
+For a source-available product the pattern that actually works is **private
+repository, public releases and public site**:
+
+1. **Settings → General → Danger Zone → Change visibility → Private.**
+   The code stops being clonable. Nothing else breaks: the landing site is served
+   by GitHub Pages from a workflow using `GITHUB_TOKEN`, and release assets are
+   downloaded by URL, so both keep working on a public repo or a private one.
+2. **Invite reviewers as read-only collaborators** when they ask, and remove
+   them when they are done. That is the actual access control.
+3. **Keep the licence in the repo** so a collaborator has the terms in front of
+   them from the moment access is granted.
+
+### What is already enforced in the application
+
+Independent of the repository setting, the app itself resists tampering:
+
+- The creator identity block carries a sealed SHA3-256 signature. Editing the
+  name, app name or version without re-sealing makes the application refuse the
+  normal splash and show a tamper notice instead.
+- Every medicine carries a `record_hash` and a `content_seal` computed over 40
+  clinical fields, re-verified on boot. A record edited outside the application
+  is reported as `TAMPERED`.
+- `/api/security/verify` exposes the full report, and the dashboard shows it.
+
+These give **detection**, which is a real and useful guarantee. They do not give
+prevention — the sealing key ships inside the executable and could in principle
+be extracted. See the earlier section on what is and is not enforced.
+
+---
+
 ## Medical disclaimer
 
 This software is a record-keeping and reference tool. The dosing information is

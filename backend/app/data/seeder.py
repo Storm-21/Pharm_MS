@@ -23,9 +23,13 @@ from app.data.seed_medicines import MEDICINES as _BASE_MEDICINES
 from app.data.seed_medicines import DOSAGE_GUIDES as _BASE_GUIDES
 from app.data.seed_medicines_extra import EXTRA_MEDICINES, EXTRA_DOSAGE_GUIDES
 from app.data.seed_medicines_batch3 import BATCH3_MEDICINES, BATCH3_GUIDES
+from app.data.seed_medicines_batch4 import BATCH4_MEDICINES, BATCH4_GUIDES
 from app.security import apply_seal
-MEDICINES = _BASE_MEDICINES + EXTRA_MEDICINES + BATCH3_MEDICINES
-DOSAGE_GUIDES = _BASE_GUIDES + EXTRA_DOSAGE_GUIDES + BATCH3_GUIDES
+# Batch order is deliberate: later batches extend earlier ones, and the
+# duplicate-name guard in ensure_seeded() rejects an accidental re-add rather
+# than silently shipping two rows for one medicine.
+MEDICINES = _BASE_MEDICINES + EXTRA_MEDICINES + BATCH3_MEDICINES + BATCH4_MEDICINES
+DOSAGE_GUIDES = _BASE_GUIDES + EXTRA_DOSAGE_GUIDES + BATCH3_GUIDES + BATCH4_GUIDES
 
 # Opening stock per medicine: (quantity, reorder_level, max_stock, storage_location)
 # Chosen so that most lines are healthy and a handful trip the reorder alert.
@@ -126,6 +130,56 @@ OPENING_STOCK = {
     "Timol 0.5% Eye Drops": (44, 12, 120, "Shelf I1 - Ophthalmic"),
 
     "Tetanus Toxoid Injection": (58, 20, 200, "Cold Chain - Refrigerator 2-8C"),
+
+    # --- Batch 4: TB programme, antimalarials, national child-health items,
+    # fixed-dose combinations and the high-volume OTC and topical lines.
+    "Isoniazid 300mg": (140, 40, 300, "Shelf K1 - Antitubercular (Schedule H1)"),
+    "Rifampicin 450mg": (120, 40, 300, "Shelf K1 - Antitubercular (Schedule H1)"),
+    "Pyrazinamide 750mg": (110, 30, 250, "Shelf K1 - Antitubercular (Schedule H1)"),
+    "Ethambutol 400mg": (110, 30, 250, "Shelf K1 - Antitubercular (Schedule H1)"),
+
+    "Artemether 20mg + Lumefantrine 120mg": (60, 20, 150, "Shelf K2 - Antimalarial"),
+    "Artesunate 60mg Injection": (28, 10, 80, "Shelf K2 - Antimalarial"),
+    "Primaquine 15mg": (90, 25, 200, "Shelf K2 - Antimalarial"),
+    "Chloroquine 250mg": (85, 25, 200, "Shelf K2 - Antimalarial"),
+
+    "ORS Low Osmolarity Sachet": (520, 150, 1000, "Shelf D1 - Child Health"),
+    "Zinc Sulphate 20mg Dispersible": (410, 120, 800, "Shelf D1 - Child Health"),
+    "Albendazole 400mg Tablet": (260, 80, 500, "Shelf D1 - Child Health"),
+
+    "Amlodipine 5mg + Atenolol 50mg": (200, 60, 400, "Shelf B2 - Cardiovascular"),
+    "Telmisartan 40mg + Amlodipine 5mg": (185, 60, 400, "Shelf B2 - Cardiovascular"),
+    "Metformin 500mg + Glimepiride 2mg": (175, 50, 400, "Shelf B2 - Cardiovascular"),
+    "Hydrochlorothiazide 12.5mg + Losartan 50mg": (160, 50, 350, "Shelf B2 - Cardiovascular"),
+
+    "Amoxicillin 500mg + Clavulanic Acid 125mg": (145, 40, 300, "Shelf E1 - Antibiotics (Schedule H1)"),
+    "Cefixime 200mg + Ofloxacin 200mg": (95, 30, 200, "Shelf E1 - Antibiotics (Schedule H1)"),
+
+    "Paracetamol 500mg + Ibuprofen 400mg": (310, 90, 600, "Shelf A1 - Analgesics"),
+    "Aceclofenac 100mg + Paracetamol 325mg": (240, 70, 500, "Shelf A1 - Analgesics"),
+    "Diclofenac 1% Gel": (68, 20, 150, "Shelf A2 - Topical"),
+    "Febuxostat 40mg": (72, 25, 180, "Shelf A3 - Musculoskeletal"),
+
+    "Budesonide 200mcg + Formoterol 6mcg Inhaler": (34, 12, 90, "Shelf F1 - Respiratory"),
+    "Tiotropium 18mcg Inhaler": (26, 10, 70, "Shelf F1 - Respiratory"),
+    "Ipratropium 20mcg + Salbutamol 100mcg Inhaler": (38, 12, 90, "Shelf F1 - Respiratory"),
+    "Montelukast 5mg Chewable": (140, 40, 300, "Shelf F1 - Respiratory"),
+
+    "Pantoprazole 40mg + Domperidone 30mg": (195, 60, 400, "Shelf C1 - Gastrointestinal"),
+    "Loperamide 2mg Capsule": (120, 35, 250, "Shelf C1 - Gastrointestinal"),
+    "Rifaximin 550mg": (44, 15, 110, "Shelf C1 - Gastrointestinal"),
+
+    "Carboxymethylcellulose 0.5% Eye Drops": (78, 25, 180, "Shelf I1 - Ophthalmic"),
+
+    "Clotrimazole 1% Cream": (92, 30, 200, "Shelf H1 - Dermatology"),
+    "Betamethasone 0.1% + Clotrimazole 1% Cream": (64, 20, 150, "Shelf H1 - Dermatology"),
+
+    "Levonorgestrel 0.75mg Tablet": (56, 20, 140, "Shelf G1 - Reproductive Health"),
+    "Tranexamic Acid 500mg": (88, 25, 200, "Shelf G1 - Reproductive Health"),
+
+    "Levetiracetam 500mg": (96, 30, 220, "Shelf J1 - Neurology"),
+    "Escitalopram 10mg": (108, 30, 250, "Shelf J1 - Neurology"),
+    "Fexofenadine 120mg": (165, 50, 350, "Shelf A4 - Antihistamines"),
 }
 
 

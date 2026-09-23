@@ -358,6 +358,89 @@ export function DosageCalculator() {
             )}
           </div>
 
+          {/* Both formulas, side by side.
+              The point of showing both is the disagreement: for a 24 kg
+              eight-year-old the weight-based method gives 412.5 mg where the
+              age band gives 250 mg, and hiding the loser would hide exactly
+              the number worth seeing. */}
+          {weightDose && weightDose.formulas && weightDose.formulas.length > 0 && (
+            <div className="bg-white rounded-lg shadow p-6">
+              <h2 className="text-xl font-semibold mb-1 flex items-center gap-2">
+                <Scale className="w-5 h-5" />
+                Both formulas, compared
+              </h2>
+              <p className="mb-4 text-sm text-gray-500">
+                The same patient and the same medicine, worked out two ways.
+              </p>
+
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                {weightDose.formulas.filter(Boolean).map((f, index) => (
+                  <div
+                    key={index}
+                    className={`rounded-lg border p-4 ${
+                      f.selected
+                        ? 'border-blue-300 bg-blue-50'
+                        : 'border-gray-200 bg-gray-50'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <p className="font-semibold text-gray-800">{f.method}</p>
+                      {f.selected && (
+                        <span className="rounded-full bg-blue-600 px-2 py-0.5 text-xs font-semibold text-white">
+                          used
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-2 font-mono text-sm text-blue-700">{f.formula}</p>
+                    <p className="mt-2 text-2xl font-bold text-gray-900">
+                      {f.dose} {f.unit}
+                    </p>
+                    {f.is_weight_based ? (
+                      <p className="mt-1 text-xs text-green-700">
+                        Uses this patient&rsquo;s recorded weight.
+                      </p>
+                    ) : (
+                      <p className="mt-1 text-xs text-gray-500">
+                        {f.assumes || 'An age-based estimate.'}
+                      </p>
+                    )}
+                    {f.capped && (
+                      <p className="mt-1 text-xs text-orange-700">
+                        Capped at the maximum single dose.
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {weightDose.is_weight_based &&
+                weightDose.formulas.length > 1 &&
+                weightDose.formulas[1] &&
+                weightDose.formulas[0].dose !== weightDose.formulas[1].dose && (
+                  <p className="mt-4 rounded border-l-4 border-blue-400 bg-blue-50 p-3 text-sm text-blue-800">
+                    The two methods differ by{' '}
+                    <strong>
+                      {Math.abs(
+                        weightDose.formulas[0].dose - weightDose.formulas[1].dose
+                      ).toFixed(1)}{' '}
+                      mg
+                    </strong>
+                    . The weight-based figure is the more precise one for this
+                    patient, because it uses their actual body weight rather
+                    than an average for their age.
+                  </p>
+                )}
+
+              {!weightDose.is_weight_based && (
+                <p className="mt-4 rounded border-l-4 border-amber-400 bg-amber-50 p-3 text-sm text-amber-800">
+                  Both figures here are age-based, because no weight is recorded
+                  for this patient. Recording the weight would allow an accurate
+                  mg/kg dose.
+                </p>
+              )}
+            </div>
+          )}
+
           {/* Weight-based calculation - the arithmetic, shown in full so it
               can be checked by hand rather than taken on trust. */}
           {weightDose && (

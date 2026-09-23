@@ -488,8 +488,11 @@ export function ClinicalWorkbench() {
               </p>
               <p className="mt-1 text-sm text-gray-500">
                 Try a broader term such as &ldquo;infection&rdquo; or
-                &ldquo;pain&rdquo;, or look the drug up in the reference
-                browser.
+                &ldquo;pain&rdquo;. To look a specific drug up, open it in the{' '}
+                <a href="/medicines" className="text-blue-600 underline">
+                  Medicine database
+                </a>{' '}
+                and use the live reference lookup at the bottom of its record.
               </p>
             </div>
           )}

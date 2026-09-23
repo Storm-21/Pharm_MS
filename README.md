@@ -45,7 +45,7 @@ deleting anything.
 
 | Area | What you get |
 |---|---|
-| **Medicine database** | 80 curated medicines across every major therapeutic class, with molecular formulas, formula weights, manufacturers and drug licence numbers, Indian Pharmacopoeia and BP/USP monograph references, mechanism of action, pharmacokinetics, pregnancy categories, HSN/GST and schedule classification |
+| **Medicine database** | 116 curated medicines across 96 therapeutic classes, with molecular formulas, formula weights, manufacturers and drug licence numbers, Indian Pharmacopoeia and BP/USP monograph references, mechanism of action, pharmacokinetics, pregnancy categories, HSN/GST and schedule classification. Coverage is weighted toward Indian community practice: the NTEP antitubercular drugs, the artemisinin combinations, ORS and zinc, the anthelmintics, and the fixed-dose combinations Indian general practice prescribes |
 | **Patients** | Records with allergy tracking that flags **within-class cross-reactivity** — a penicillin allergy correctly blocks amoxicillin — plus weight, serum creatinine, hepatic and renal status, and pregnancy/lactation, which the dosing and safety checks depend on |
 | **Clinical workbench** | One screen for the whole counter decision: what is safe, what is in stock, what to substitute, and how long to take it for |
 | **Safety engine** | Every recommendation is gated. Graded verdicts (contraindicated / serious / caution / safe / **cannot verify**), covering allergy cross-reactivity, comorbidity conflicts, serious drug interactions, Beers Criteria for the over-65s, paediatric age limits, pregnancy and lactation, renal dosing by eGFR, hepatic impairment and dose ceilings |
@@ -117,6 +117,45 @@ your pharmacy's own name and logo.
 | [`INSTALLATION_GUIDE.md`](INSTALLATION_GUIDE.md) | Installing, uninstalling, backing up, moving to a new PC |
 | [`USAGE_GUIDE.md`](USAGE_GUIDE.md) | A walkthrough of every screen in the app |
 | [`DEVELOPER_NOTES.md`](DEVELOPER_NOTES.md) | Building, publishing, licence keys, bug history |
+
+---
+
+## Licence and source access
+
+PharmMS is **proprietary source-available** software. It is **not** open
+source, and it is not covered by Apache, MIT or any similar permissive licence.
+The full terms are in [`LICENSE`](LICENSE); the short version is:
+
+| | |
+|---|---|
+| **Running the application** | Free, including commercial pharmacy use |
+| **Reading the source** | On request — see below |
+| **Copying or modifying the source** | Not permitted |
+| **Redistributing the source or a modified build** | Not permitted |
+| **Removing attribution or the integrity seals** | Not permitted |
+
+### Requesting source access
+
+The source is shared with people who have a specific reason to read it — a
+pharmacy integrating it, a developer doing technical due diligence, or a reviewer
+checking the dosing and safety logic.
+
+1. Open an issue titled **Source access request** at
+   <https://github.com/Storm-21/Pharm_MS/issues/new>
+2. Say who you are and what you intend to do with the code.
+3. You will get read access and the design notes for the dosing and safety engines.
+
+Access is granted for reading, evaluation and integration work. It does not
+transfer ownership, and it does not permit redistributing a modified copy as
+PharmMS.
+
+> **Note on what GitHub can and cannot enforce.** A public repository is visible
+> and clonable by anyone, and GitHub has no setting that makes a repository
+> readable but not downloadable. The licence above is therefore a legal
+> restriction rather than a technical one — it says clearly what is and is not
+> allowed, and it is enforceable, but it cannot physically prevent a determined
+> person from copying a public repository. Keeping the repository private is the
+> only technical control that does. See `DEVELOPER_NOTES.md` for the options.
 
 ---
 
