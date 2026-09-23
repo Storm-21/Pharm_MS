@@ -482,16 +482,34 @@ $iconPath = Join-Path $BackendDir 'pharms.ico'
 # consequence of a missing icon is a generic icon on the shortcut.
 $iconArgs = @()
 if (Test-Path $iconPath) {
-    $iconArgs = @("/win32icon:`"$iconPath`"")
+    # NOTE: the quotes matter, and their absence was a real CI failure.
+    #
+    # This was written as @("/win32icon:`"$iconPath`""), which embeds literal
+    # double-quote characters into the array element. PowerShell 7 - what GitHub
+    # Actions runs for `shell: pwsh` - passes an array element through to the
+    # native command line verbatim, so csc.exe received a filename that began and
+    # ended with a quote and rejected it:
+    #
+    #     fatal error CS2021: File name '"D:\a\...\pharms.ico"' is too long or invalid
+    #
+    # PowerShell 5.1 is more forgiving and strips them, which is why the build
+    # worked locally and failed on every CI run. Supplying the switch and its
+    # value as two separate array elements lets the runtime quote each one
+    # correctly, so no quoting is written by hand at all.
+    $iconArgs = @('/win32icon:', $iconPath)
 } else {
     Write-Host "    WARNING: $iconPath not found - building without a custom icon." -ForegroundColor Yellow
 }
 
 Push-Location $BuildStage
 try {
+    # /out and /resource are written as single tokens with the value inside the
+    # string, which is safe because the quotes there are PowerShell syntax and
+    # are removed before the argument is built. The icon is passed through
+    # $iconArgs instead, precisely to avoid hand-written quoting.
     & $csc /nologo /target:winexe `
-        /out:"$OutSetup" `
-        /resource:"$SetupPs1",setup.ps1 `
+        "/out:$OutSetup" `
+        "/resource:$SetupPs1,setup.ps1" `
         @iconArgs `
         /reference:System.dll `
         /reference:System.Windows.Forms.dll `
