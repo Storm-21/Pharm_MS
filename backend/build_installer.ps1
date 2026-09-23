@@ -482,21 +482,20 @@ $iconPath = Join-Path $BackendDir 'pharms.ico'
 # consequence of a missing icon is a generic icon on the shortcut.
 $iconArgs = @()
 if (Test-Path $iconPath) {
-    # NOTE: the quotes matter, and their absence was a real CI failure.
+    # The switch and its value must be ONE command-line token, because csc.exe
+    # expects "/win32icon:path" and treats a separated path as an extra,
+    # unconsumed argument:
     #
-    # This was written as @("/win32icon:`"$iconPath`""), which embeds literal
-    # double-quote characters into the array element. PowerShell 7 - what GitHub
-    # Actions runs for `shell: pwsh` - passes an array element through to the
-    # native command line verbatim, so csc.exe received a filename that began and
-    # ended with a quote and rejected it:
+    #     fatal error CS2005: Missing file specification for '/win32icon:' option
     #
-    #     fatal error CS2021: File name '"D:\a\...\pharms.ico"' is too long or invalid
+    # Two earlier attempts got this wrong in opposite directions:
+    #   @("/win32icon:`"$iconPath`"")   literal quotes -> CS2021 invalid filename
+    #   @('/win32icon:', $iconPath)      split token  -> CS2005 missing file
     #
-    # PowerShell 5.1 is more forgiving and strips them, which is why the build
-    # worked locally and failed on every CI run. Supplying the switch and its
-    # value as two separate array elements lets the runtime quote each one
-    # correctly, so no quoting is written by hand at all.
-    $iconArgs = @('/win32icon:', $iconPath)
+    # Joining them into a single array element is the form that works on both
+    # PowerShell 5.1 and 7: the runtime quotes the element as a whole, so the
+    # space-free path needs no quoting and no quote character ever reaches csc.
+    $iconArgs = @("/win32icon:$iconPath")
 } else {
     Write-Host "    WARNING: $iconPath not found - building without a custom icon." -ForegroundColor Yellow
 }
