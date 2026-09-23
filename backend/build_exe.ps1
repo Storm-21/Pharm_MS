@@ -139,11 +139,38 @@ if (Test-Path $IssuedTable) {
 
 # --- 2. PyInstaller ----------------------------------------------------------
 Write-Step 'Ensuring PyInstaller is available'
-& $VenvPython -m PyInstaller --version *> $null
+
+# Query the module through `importlib.util.find_spec`, NOT by running
+# `python -m PyInstaller --version`.
+#
+# WHY: on a clean machine PyInstaller is absent, so Python writes
+# "No module named PyInstaller" to stderr. Under $ErrorActionPreference = 'Stop'
+# PowerShell turns a native command's stderr into a terminating
+# NativeCommandError, so the script died on the probe line - before reaching the
+# install below that existed precisely to handle this case. The `*> $null`
+# redirect does not prevent it: the error record is created while the command is
+# being set up, not from the stream it writes to.
+#
+# That made the build fail on any fresh checkout, which is every CI run, while
+# passing on every developer machine where the package was already installed.
+# find_spec returns None instead of raising or writing to stderr, so there is
+# nothing for PowerShell to escalate.
+$pyInstallerPresent = & $VenvPython -c "import importlib.util,sys; sys.exit(0 if importlib.util.find_spec('PyInstaller') else 1)" 2>$null
 if ($LASTEXITCODE -ne 0) {
-    Write-Host '    Installing PyInstaller...'
-    & $VenvPython -m pip install --upgrade pyinstaller
-    if ($LASTEXITCODE -ne 0) { Fail 'Could not install PyInstaller.' }
+    Write-Host '    PyInstaller missing - installing it...'
+    # Capture pip's own output the same way: judge by exit code, never by stderr.
+    $pipLog = Join-Path $env:TEMP 'pharms_pip.log'
+    $pipProc = Start-Process -FilePath $VenvPython `
+        -ArgumentList @('-m', 'pip', 'install', '--upgrade', 'pyinstaller') `
+        -NoNewWindow -Wait -PassThru `
+        -RedirectStandardOutput $pipLog `
+        -RedirectStandardError "$pipLog.err"
+    if ($pipProc.ExitCode -ne 0) {
+        Write-Host '--- pip output (last 25 lines) ---' -ForegroundColor Yellow
+        Get-Content "$pipLog.err" -ErrorAction SilentlyContinue | Select-Object -Last 25
+        Fail 'Could not install PyInstaller.'
+    }
+    Write-Host '    PyInstaller installed.'
 }
 
 # --- 3. Clean ----------------------------------------------------------------

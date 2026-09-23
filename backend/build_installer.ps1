@@ -41,18 +41,20 @@ function Fail($m) { Write-Host "ERROR: $m" -ForegroundColor Red; exit 1 }
 # --- 1. Build the application payload ---------------------------------------
 if (-not $SkipAppBuild) {
     Write-Step 'Building the application payload'
-    # NOTE: build_exe.ps1 is invoked WITHOUT -SkipFrontend. An earlier version
-    # passed -SkipFrontend here on the assumption that the frontend had already
-    # been built, but nothing in the chain actually built it - the CI workflow
-    # only runs `npm ci`, which installs dependencies and produces no bundle.
-    # build_exe.ps1 then failed at
-    #     "No frontend build at .../frontend/build/index.html"
-    # and because it exits non-zero, the whole installer build stopped there.
-    # That is why every Build installer run failed. Let the app build own the
-    # frontend step; it already knows how to reuse an existing bundle when one
-    # is present, so a local rebuild stays fast.
+    # The script is invoked with the call operator and judged by the artefact it
+    # is supposed to produce, NOT by $LASTEXITCODE.
+    #
+    # $LASTEXITCODE reflects the last *native* command to run, and it survives
+    # the call - so after a successful build it still held the exit code of
+    # whatever program ran last inside build_exe.ps1 (a python or pip call).
+    # The build would finish, print "Build complete", and then be reported as
+    # "ERROR: Application build failed" immediately afterwards, because the
+    # stale code happened to be non-zero. Checking the output is both correct
+    # and the thing we actually care about.
     & (Join-Path $BackendDir 'build_exe.ps1')
-    if ($LASTEXITCODE -ne 0) { Fail 'Application build failed.' }
+    if (-not (Test-Path $PayloadExe)) {
+        Fail "Application build did not produce $PayloadExe"
+    }
 }
 
 if (-not (Test-Path $PayloadExe)) {
