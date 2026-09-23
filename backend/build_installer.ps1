@@ -41,7 +41,17 @@ function Fail($m) { Write-Host "ERROR: $m" -ForegroundColor Red; exit 1 }
 # --- 1. Build the application payload ---------------------------------------
 if (-not $SkipAppBuild) {
     Write-Step 'Building the application payload'
-    & (Join-Path $BackendDir 'build_exe.ps1') -SkipFrontend
+    # NOTE: build_exe.ps1 is invoked WITHOUT -SkipFrontend. An earlier version
+    # passed -SkipFrontend here on the assumption that the frontend had already
+    # been built, but nothing in the chain actually built it - the CI workflow
+    # only runs `npm ci`, which installs dependencies and produces no bundle.
+    # build_exe.ps1 then failed at
+    #     "No frontend build at .../frontend/build/index.html"
+    # and because it exits non-zero, the whole installer build stopped there.
+    # That is why every Build installer run failed. Let the app build own the
+    # frontend step; it already knows how to reuse an existing bundle when one
+    # is present, so a local rebuild stays fast.
+    & (Join-Path $BackendDir 'build_exe.ps1')
     if ($LASTEXITCODE -ne 0) { Fail 'Application build failed.' }
 }
 

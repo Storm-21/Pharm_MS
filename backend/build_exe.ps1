@@ -32,6 +32,55 @@ function Fail($message) {
     exit 1
 }
 
+<#
+Run npm and judge it purely by its exit code.
+
+WHY THIS WRAPPER EXISTS
+-----------------------
+The script runs with $ErrorActionPreference = 'Stop'. npm writes progress and
+deprecation notices to stderr, and PowerShell turns any native command's stderr
+output into a NativeCommandError record - which, under 'Stop', terminates the
+script. The frontend build was therefore able to abort with a success-looking
+message like
+
+    (node:1234) [DEP0176] DeprecationWarning: fs.F_OK is deprecated...
+
+before reaching PyInstaller, leaving no .exe behind and no obvious reason why.
+Redirecting stderr into the pipeline and checking $LASTEXITCODE explicitly makes
+the exit code the only thing that decides success, which is what the note in
+the PyInstaller step below already does and for exactly the same reason.
+#>
+function Invoke-Npm {
+    param([string[]]$Arguments)
+    $npmLog = Join-Path $env:TEMP 'pharms_npm.log'
+    # Resolve npm.cmd specifically. A bare `npm` resolves to npm.ps1 on Windows,
+    # and Start-Process cannot execute a PowerShell script as an application -
+    # it fails with "%1 is not a valid Win32 application". The .cmd shim is the
+    # real entry point.
+    $npmCmd = $null
+    foreach ($candidate in @('npm.cmd', 'npm.exe')) {
+        $found = Get-Command $candidate -ErrorAction SilentlyContinue
+        if ($found) { $npmCmd = $found.Source; break }
+    }
+    if (-not $npmCmd) {
+        foreach ($candidate in @('C:\Program Files\nodejs\npm.cmd')) {
+            if (Test-Path $candidate) { $npmCmd = $candidate; break }
+        }
+    }
+    if (-not $npmCmd) { Fail 'npm not found. Install Node.js.' }
+    $proc = Start-Process -FilePath $npmCmd -ArgumentList $Arguments `
+        -NoNewWindow -Wait -PassThru `
+        -RedirectStandardOutput $npmLog `
+        -RedirectStandardError "$npmLog.err"
+    if ($proc.ExitCode -ne 0) {
+        Write-Host '--- npm output (last 30 lines) ---' -ForegroundColor Yellow
+        Get-Content "$npmLog.err" -ErrorAction SilentlyContinue | Select-Object -Last 30
+        Get-Content $npmLog -ErrorAction SilentlyContinue | Select-Object -Last 30
+        Fail "npm $($Arguments -join ' ') failed (exit $($proc.ExitCode))."
+    }
+    Get-Content $npmLog -ErrorAction SilentlyContinue | Select-Object -Last 5
+}
+
 if (-not (Test-Path $VenvPython)) {
     Fail "Python venv not found at $VenvPython. Create it with: python -m venv venv"
 }
@@ -55,13 +104,12 @@ if (-not $SkipFrontend) {
     if (-not (Test-Path (Join-Path $FrontendDir 'node_modules'))) {
         Write-Host '    node_modules missing - running npm install...'
         Push-Location $FrontendDir
-        try { & npm install } finally { Pop-Location }
+        try { Invoke-Npm -Arguments @('install') | Out-Null } finally { Pop-Location }
     }
 
     Push-Location $FrontendDir
     try {
-        & npm run build
-        if ($LASTEXITCODE -ne 0) { Fail 'npm run build failed.' }
+        Invoke-Npm -Arguments @('run', 'build') | Out-Null
     } finally {
         Pop-Location
     }
