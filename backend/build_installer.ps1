@@ -27,6 +27,13 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+# See the note in build_exe.ps1: GitHub Actions runs `shell: pwsh` (PowerShell 7),
+# where a native command writing to stderr raises a terminating
+# NativeCommandError under 'Stop'. npm and pip both write progress there, so a
+# perfectly good build could abort on a deprecation notice. Real failures are
+# still caught, because every caller below checks its exit code or the artefact
+# it expects.
+$PSNativeCommandUseErrorActionPreference = $false
 
 $BackendDir   = $PSScriptRoot
 $PayloadExe   = Join-Path $BackendDir 'dist\PharmMS.exe'

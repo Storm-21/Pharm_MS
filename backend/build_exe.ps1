@@ -16,7 +16,15 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
-
+# Native commands are the exception. In PowerShell 7 (the version GitHub
+# Actions uses for `shell: pwsh`) a native command that writes to stderr raises
+# a terminating NativeCommandError under 'Stop', which aborts a build that was
+# otherwise fine - npm deprecation notices and pip's resolver output are enough.
+# PowerShell 5.1, which a developer machine uses, is more forgiving, so the
+# difference only ever shows up on CI. `Continue` for native commands keeps
+# real errors fatal (each caller checks its exit code) without turning ordinary
+# progress output into a build failure.
+$PSNativeCommandUseErrorActionPreference = $false
 $BackendDir  = $PSScriptRoot
 $ProjectDir  = Split-Path $BackendDir -Parent
 $FrontendDir = Join-Path $ProjectDir 'frontend'
@@ -30,6 +38,30 @@ function Write-Step($message) {
 function Fail($message) {
     Write-Host "ERROR: $message" -ForegroundColor Red
     exit 1
+}
+
+<#
+Run the venv Python and judge it only by its exit code.
+
+Mirrors Invoke-Npm below, and exists for the same reason: pip writes resolver
+progress and dependency-conflict notices to stderr, and under
+$ErrorActionPreference = 'Stop' PowerShell can escalate that into a terminating
+error. The PyInstaller install step was the first casualty of this. Exit code is
+the only reliable signal.
+#>
+function Invoke-VenvPython {
+    param([string[]]$Arguments, [switch]$Quiet)
+    $pyLog = Join-Path $env:TEMP 'pharms_py.log'
+    $proc = Start-Process -FilePath $VenvPython -ArgumentList $Arguments `
+        -NoNewWindow -Wait -PassThru `
+        -RedirectStandardOutput $pyLog `
+        -RedirectStandardError "$pyLog.err"
+    if ($proc.ExitCode -ne 0 -and -not $Quiet) {
+        Write-Host '--- python output (last 25 lines) ---' -ForegroundColor Yellow
+        Get-Content "$pyLog.err" -ErrorAction SilentlyContinue | Select-Object -Last 25
+        Get-Content $pyLog -ErrorAction SilentlyContinue | Select-Object -Last 25
+    }
+    return $proc.ExitCode
 }
 
 <#
@@ -155,21 +187,11 @@ Write-Step 'Ensuring PyInstaller is available'
 # passing on every developer machine where the package was already installed.
 # find_spec returns None instead of raising or writing to stderr, so there is
 # nothing for PowerShell to escalate.
-$pyInstallerPresent = & $VenvPython -c "import importlib.util,sys; sys.exit(0 if importlib.util.find_spec('PyInstaller') else 1)" 2>$null
-if ($LASTEXITCODE -ne 0) {
+$pyInstallerPresent = Invoke-VenvPython -Arguments @('-c', "import importlib.util,sys; sys.exit(0 if importlib.util.find_spec('PyInstaller') else 1)") -Quiet
+if ($pyInstallerPresent -ne 0) {
     Write-Host '    PyInstaller missing - installing it...'
-    # Capture pip's own output the same way: judge by exit code, never by stderr.
-    $pipLog = Join-Path $env:TEMP 'pharms_pip.log'
-    $pipProc = Start-Process -FilePath $VenvPython `
-        -ArgumentList @('-m', 'pip', 'install', '--upgrade', 'pyinstaller') `
-        -NoNewWindow -Wait -PassThru `
-        -RedirectStandardOutput $pipLog `
-        -RedirectStandardError "$pipLog.err"
-    if ($pipProc.ExitCode -ne 0) {
-        Write-Host '--- pip output (last 25 lines) ---' -ForegroundColor Yellow
-        Get-Content "$pipLog.err" -ErrorAction SilentlyContinue | Select-Object -Last 25
-        Fail 'Could not install PyInstaller.'
-    }
+    $code = Invoke-VenvPython -Arguments @('-m', 'pip', 'install', '--upgrade', 'pyinstaller')
+    if ($code -ne 0) { Fail 'Could not install PyInstaller.' }
     Write-Host '    PyInstaller installed.'
 }
 

@@ -1,4 +1,4 @@
-# Build PharmMS-Setup.exe and attach it to a GitHub Release.
+﻿# Build PharmMS-Setup.exe and attach it to a GitHub Release.
 #
 # TRIGGERS
 #   * pushing a tag like v2.0.0  -> builds and publishes a Release
@@ -58,51 +58,51 @@ jobs:
       # build_exe.ps1 expects a venv at backend\venv\Scripts\python.exe. Creating
       # it here keeps CI on exactly the same code path a developer runs locally,
       # so a green build really does mean "the documented command works".
-      - name: Create the Python virtual environment
+      - name: Install the Python virtual environment
         working-directory: backend
         shell: pwsh
         run: |
           python -m venv venv
           .\venv\Scripts\python.exe -m pip install --upgrade pip
           .\venv\Scripts\python.exe -m pip install -r requirements.txt
+          # PyInstaller is deliberately not in requirements.txt: it is a build
+          # tool, not an application dependency, and build_exe.ps1 installs it
+          # on demand for developers. Installing it here as well means the CI
+          # build does not depend on that on-demand path working, which is one
+          # less thing that can differ between a runner and a laptop.
+          .\venv\Scripts\python.exe -m pip install --upgrade pyinstaller
 
       - name: Install frontend dependencies
         working-directory: frontend
         shell: pwsh
         run: npm ci
 
-      # Capture the build's full output into the job summary.
+      # Build, and capture the full output into the job summary.
       #
-      # WHY: when this workflow fails, the log is only reachable through an
-      # authenticated session - `gh run view --log` or the web UI - and the
-      # annotations the public API exposes say only "Process completed with exit
-      # code 1". That made a failure impossible to diagnose from the command
-      # line, which is where the fix has to be written. The summary is readable
-      # without authentication and travels with the run, so the reason for a
-      # failure is visible to anyone looking at it.
+      # WHY: a failed run's log is only reachable through an authenticated
+      # session - `gh run view --log` or the web UI - and the public API exposes
+      # just "Process completed with exit code 1" as an annotation. That makes a
+      # CI failure impossible to diagnose from the command line, which is where
+      # the fix has to be written. The step summary is readable without signing
+      # in, so the reason for a failure is visible to anyone looking at the run.
       - name: Build the application and the installer
         working-directory: backend
         shell: pwsh
         run: |
-          # 2>&1 keeps stderr in the same stream so nothing is lost, and
-          # $ErrorActionPreference is relaxed only for this step: the build
-          # script sets its own, and a transcript must survive a terminating
-          # error in order to be useful.
-          $ErrorActionPreference = 'Continue'
-          Start-Transcript -Path build-transcript.log -Force | Out-Null
-          try {
-            .\build_installer.ps1 2>&1 | Tee-Object -Variable buildOutput | Out-Host
-            $code = $LASTEXITCODE
-          } finally {
-            Stop-Transcript | Out-Null
+          # Redirect the build's own streams to a file. A transcript does not
+          # flush when the script exits on a terminating error, which is exactly
+          # the case worth capturing.
+          .\build_installer.ps1 *> build.log
+          $code = $LASTEXITCODE
+          $text = Get-Content build.log -Raw -ErrorAction SilentlyContinue
+          if (-not $text) { $text = '(no output captured)' }
+          if ($text.Length -gt 50000) { $text = $text.Substring($text.Length - 50000) }
+          "## Build output (exit $code)`n``text`n$text`n``" | Add-Content $env:GITHUB_STEP_SUMMARY
+          "## Artefacts present`n" + ((Get-ChildItem dist -ErrorAction SilentlyContinue | ForEach-Object { "- $($_.Name) $([math]::Round($_.Length/1MB,1)) MB" }) -join "`n") | Add-Content $env:GITHUB_STEP_SUMMARY
+          if (-not (Test-Path 'dist/PharmMS-Setup.exe')) {
+            Write-Host '::error::Installer was not produced - see the build output in the job summary.'
+            exit 1
           }
-
-          $text = ($buildOutput | Out-String)
-          if ($text.Length -gt 60000) { $text = $text.Substring($text.Length - 60000) }
-          "## Build output`n``````text`n$text`n``````" | Add-Content -Path $env:GITHUB_STEP_SUMMARY
-          "## Artefacts present`n" + ((Get-ChildItem dist -ErrorAction SilentlyContinue | ForEach-Object { "- $($_.Name) $([math]::Round($_.Length/1MB,1)) MB" }) -join "`n") | Add-Content -Path $env:GITHUB_STEP_SUMMARY
-
-          if (-not (Test-Path 'dist\PharmMS-Setup.exe')) { exit 1 }
 
       - name: Verify the installer was produced
         working-directory: backend
