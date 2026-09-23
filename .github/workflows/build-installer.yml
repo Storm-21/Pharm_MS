@@ -71,10 +71,38 @@ jobs:
         shell: pwsh
         run: npm ci
 
+      # Capture the build's full output into the job summary.
+      #
+      # WHY: when this workflow fails, the log is only reachable through an
+      # authenticated session - `gh run view --log` or the web UI - and the
+      # annotations the public API exposes say only "Process completed with exit
+      # code 1". That made a failure impossible to diagnose from the command
+      # line, which is where the fix has to be written. The summary is readable
+      # without authentication and travels with the run, so the reason for a
+      # failure is visible to anyone looking at it.
       - name: Build the application and the installer
         working-directory: backend
         shell: pwsh
-        run: .\build_installer.ps1
+        run: |
+          # 2>&1 keeps stderr in the same stream so nothing is lost, and
+          # $ErrorActionPreference is relaxed only for this step: the build
+          # script sets its own, and a transcript must survive a terminating
+          # error in order to be useful.
+          $ErrorActionPreference = 'Continue'
+          Start-Transcript -Path build-transcript.log -Force | Out-Null
+          try {
+            .\build_installer.ps1 2>&1 | Tee-Object -Variable buildOutput | Out-Host
+            $code = $LASTEXITCODE
+          } finally {
+            Stop-Transcript | Out-Null
+          }
+
+          $text = ($buildOutput | Out-String)
+          if ($text.Length -gt 60000) { $text = $text.Substring($text.Length - 60000) }
+          "## Build output`n``````text`n$text`n``````" | Add-Content -Path $env:GITHUB_STEP_SUMMARY
+          "## Artefacts present`n" + ((Get-ChildItem dist -ErrorAction SilentlyContinue | ForEach-Object { "- $($_.Name) $([math]::Round($_.Length/1MB,1)) MB" }) -join "`n") | Add-Content -Path $env:GITHUB_STEP_SUMMARY
+
+          if (-not (Test-Path 'dist\PharmMS-Setup.exe')) { exit 1 }
 
       - name: Verify the installer was produced
         working-directory: backend
