@@ -7,6 +7,7 @@ from .recommender_service import (
     InventoryOptimizer,
 )
 from . import storage_service
+from . import medicine_image_service
 __all__ = [
     'DosageCalculator',
     'InteractionChecker',
@@ -16,4 +17,5 @@ __all__ = [
     'AlternativeFinder',
     'InventoryOptimizer',
     'storage_service',
+    'medicine_image_service',
 ]

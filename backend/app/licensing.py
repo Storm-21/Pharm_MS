@@ -257,11 +257,32 @@ def _mask(key):
 
 
 def is_licensed():
-    """True when a valid key is stored for the stored pharmacy name."""
+    """
+    True when a valid licence is stored for the stored pharmacy name.
+
+    Two kinds are accepted: a one-time activation token (checked against both the
+    issued-token ledger and the local redemption record) and the original
+    name-bound key, so a licence sold before the token system keeps working.
+    """
     name = get_setting('pharmacy_name')
     key = get_setting('licence_key')
     if not name or not key:
         return False
+
+    from app import activation
+    kind = get_setting('licence_kind')
+    if kind == 'activation_token' or len(activation.clean_token(key)) == activation.TOKEN_BODY_LEN:
+        ok, _reason, _entry = activation.validate(key)
+        if not ok:
+            return False
+        # The token must have been redeemed for THIS name. A token redeemed for
+        # another shop must not license this one, which is what makes the ledger
+        # entry meaningful rather than decorative.
+        spent_on = activation.redeemed_for(key)
+        if spent_on and spent_on.strip().lower() != name.strip().lower():
+            return False
+        return True
+
     return validate_key(name, key)
 
 
@@ -269,35 +290,87 @@ def apply_licence(pharmacy_name, licence_key):
     """
     Attempt to activate a licence.
 
+    A one-time activation token issued against this build is tried first (see
+    app/activation.py - tokens are single-use and valid indefinitely). The
+    original name-bound key is still accepted as a fallback so any licence sold
+    before the token system existed keeps working; a customer who already
+    activated with one is never locked out by this upgrade.
+
     Stores the name and key on success. Returns (ok, message).
     """
+    from app import activation
+
     if not pharmacy_name or not pharmacy_name.strip():
         return False, 'Enter your pharmacy name.'
     if not licence_key or not licence_key.strip():
         return False, 'Enter the licence key you were issued.'
 
+    raw_key = licence_key.strip()
+
+    # --- Path 1: single-use activation token -------------------------------
+    # A token is recognisable by its shape. Anything that *looks like an attempt*
+    # at a token is routed here so the customer gets the message about the
+    # token's shape rather than a confusing complaint about pharmacy-name
+    # binding. Two cases reach here, and both should:
+    #
+    #   * the PMS prefix - unambiguously a token attempt, whatever its length.
+    #     Tested on the RAW input, because clean_token() strips the prefix - so
+    #     checking the cleaned value for 'PMS' could never be true.
+    #   * 14+ characters - longer than a name-bound key a customer is likely to
+    #     hold, so almost certainly a mistyped token
+    #
+    # Why this matters: routing only an exact 20-character match meant a mistyped
+    # 19-character token fell through to the legacy key path and was rejected for
+    # the wrong reason entirely, which is what test_activation.py caught.
+    cleaned = activation.clean_token(raw_key)
+    looks_like_token = (
+        raw_key.upper().startswith(activation.TOKEN_PREFIX)
+        or len(cleaned) >= 14
+    )
+    if looks_like_token:
+        ok, message = activation.service().redeem(raw_key, pharmacy_name)
+        if not ok:
+            return False, message
+        set_setting('pharmacy_name', pharmacy_name.strip())
+        set_setting('licence_key', raw_key)
+        set_setting('licence_kind', 'activation_token')
+        db.session.commit()
+        return True, message
+
+    # --- Path 2: the original name-bound key -------------------------------
     if not validate_key(pharmacy_name, licence_key):
         return False, (
             'That key does not match this pharmacy name. Keys are bound to the '
             'exact name they were issued for, so spelling and punctuation matter '
             '(they are ignored during checking, so "Sri Balaji Medicals" and '
-            '"sri balaji medicals" both work).'
+            '"sri balaji medicals" both work). Activation tokens, by contrast, '
+            'are not name-bound and can be activated for any name.'
         )
 
     set_setting('pharmacy_name', pharmacy_name.strip())
-    set_setting('licence_key', licence_key.strip())
+    set_setting('licence_key', raw_key)
+    set_setting('licence_kind', 'name_bound_key')
     db.session.commit()
     return True, f"Licence activated. The application is now branded as {pharmacy_name.strip()}."
 
 
 def clear_licence():
-    """Remove the licence and revert to the shipped product identity."""
-    for key in ('licence_key', 'pharmacy_name'):
+    """
+    Remove the licence and revert to the shipped product identity.
+
+    The redemption record is deliberately **kept**. Deleting it would let a
+    single-use token be redeemed again after a deactivate/reactivate cycle, which
+    is exactly the reuse the token system exists to prevent. The audit trail of
+    "this token was spent on this computer" outlives the branding it unlocked.
+    """
+    for key in ('licence_key', 'pharmacy_name', 'licence_kind'):
         row = AppSetting.query.get(key)
         if row:
             db.session.delete(row)
     db.session.commit()
-    return True, 'Licence removed. The application reverted to its original branding.'
+    return True, ('Licence removed. The application reverted to its original '
+                  'branding. The activation record is kept, so this token cannot '
+                  'be used to activate a different computer.')
 
 
 def save_logo(file_storage, data_dir):
@@ -373,9 +446,16 @@ def remove_logo():
 
 def licence_status():
     """Everything the UI needs to render the branding panel."""
-    return {
+    from app import activation
+
+    status = {
         'licensed': is_licensed(),
         'verifier': _verifier(),
         'key_format': 'PMS-XXXX-XXXX-XXXX-XXXX',
         'price_inr': 500,
+        'licence_kind': get_setting('licence_kind') or None,
     }
+    # Activation-token details, so the panel can explain single-use and show the
+    # redemption audit log without the UI importing the activation module.
+    status.update(activation.service().status())
+    return status

@@ -531,9 +531,9 @@ def prescription_report(prescription_id):
  {prescriber_block}
  {meta_band}
 
-  {rx_block}
+ {patient_block}
 
-  {patient_block}
+ {rx_block}
 
  <div class="section">
     <h3>Inscription &mdash; medicines prescribed</h3>

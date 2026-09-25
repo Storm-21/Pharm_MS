@@ -24,14 +24,36 @@ Ask me if you want either of those wired up.
 import hashlib
 
 # --- Creator identity --------------------------------------------------------
-CREATOR_NAME = "Jayant"
-CREATOR_TITLE = "Creator & Lead Developer"
+# The owner/admin of the project. A change here WITHOUT re-sealing makes
+# verify_identity() fail and the app boots into the tamper notice, so these are
+# the values the seal below covers.
+CREATOR_NAME = "Jayant Mishra"
+CREATOR_TITLE = "Owner & Administrator"
 APP_NAME = "Pharmacy Management System"
 APP_SHORT_NAME = "PharmMS"
-APP_VERSION = "2.0.0"
+APP_VERSION = "2.2.0"
+
+# --- Contributing developers -------------------------------------------------
+# Listed on the startup screen and the Branding page. Kept as a list of dicts so
+# adding a name never requires touching the UI - the splash and the credits panel
+# both iterate it.
+DEVELOPERS = [
+    {"name": "Jayant Mishra", "role": "Owner & Administrator", "lead": True},
+    {"name": "Shashwat Singh", "role": "Sub-Developer", "lead": False},
+]
 
 # Public contact / attribution line shown on the splash screen.
 ATTRIBUTION = f"Designed & Developed by {CREATOR_NAME}"
+
+
+def contributors():
+    """Everyone credited, owner first. Single source for the UI."""
+    return [dict(person) for person in DEVELOPERS]
+
+
+def secondary_developers():
+    """Credited developers who are not the owner."""
+    return [dict(p) for p in DEVELOPERS if not p.get("lead")]
 
 # --- Integrity checksum ------------------------------------------------------
 # Proves the identity block above has not been altered after release.
@@ -40,11 +62,18 @@ _IDENTITY_SEED = "PharmMS::v2::creator-lock"
 
 def identity_signature(name=None, short_name=None, version=None):
     """Return the expected signature for the given identity values."""
+    # Contributors are part of the sealed block too: a credit added or removed
+    # without re-sealing is a change to who the app says built it, which is
+    # exactly what this seal exists to detect.
+    credits = ";".join(
+        "%s=%s" % (p["name"], p["role"]) for p in DEVELOPERS
+    )
     payload = "|".join([
         _IDENTITY_SEED,
         name if name is not None else CREATOR_NAME,
         short_name if short_name is not None else APP_SHORT_NAME,
         version if version is not None else APP_VERSION,
+        credits,
     ])
     return hashlib.sha3_256(payload.encode("utf-8")).hexdigest()
 
@@ -75,6 +104,8 @@ def branding_payload():
         "app_version": APP_VERSION,
         "creator_name": CREATOR_NAME,
         "creator_title": CREATOR_TITLE,
+        "contributors": contributors(),
+        "developers": secondary_developers(),
         "attribution": ATTRIBUTION,
         "integrity_ok": ok,
         "signature": signature,

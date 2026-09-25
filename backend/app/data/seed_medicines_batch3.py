@@ -828,14 +828,7 @@ BATCH3_GUIDES = [
      "special_notes": "Take in the morning. Check electrolytes at 2-4 weeks. 12.5-25 mg is the usual antihypertensive range."},
 
     # --- Furosemide -----------------------------------------------------
-    {"medicine_name": "Furosemide 40mg", "age_group": "18+", "dosage_amount": 40,
-     "dosage_unit": "mg", "frequency": "Once daily", "duration_days": 30,
-     "indication": "Oedema",
-     "special_notes": "Take in the morning to avoid nocturia. Titrate to response; monitor potassium, sodium and renal function."},
-    {"medicine_name": "Furosemide 40mg", "age_group": "18+", "dosage_amount": 20,
-     "dosage_unit": "mg", "frequency": "Once daily", "duration_days": 30,
-     "indication": "Oedema - elderly",
-     "special_notes": "Start at a lower dose in the elderly, who are more prone to dehydration and electrolyte loss."},
+    {"medicine_name": "Furosemide 40mg", "age_group": "18+", "dosage_amount": 40, "dosage_unit": "mg", "frequency": "Once daily", "duration_days": 30, "indication": "Oedema", "special_notes": "Take in the morning to avoid nocturia. Titrate to response; monitor potassium, sodium and renal function. In the elderly start at a lower dose (20 mg), as they are more prone to dehydration and electrolyte loss."},
 
     # --- Prednisolone ---------------------------------------------------
     {"medicine_name": "Prednisolone 10mg", "age_group": "18+", "dosage_amount": 40,
@@ -928,12 +921,5 @@ BATCH3_GUIDES = [
      "special_notes": "Start 20 mg in the morning; wait 4-6 weeks before judging benefit. Maximum 60 mg/day."},
 
     # --- Montelukast paediatric (batch 2 medicine, guide added here) ----
-    {"medicine_name": "Montelukast 10mg", "age_group": "6-12", "dosage_amount": 5,
-     "dosage_unit": "mg", "frequency": "Once daily", "duration_days": 30,
-     "indication": "Asthma prophylaxis",
-     "special_notes": "5 mg chewable tablet once daily in the evening for children aged 6-14."},
-    {"medicine_name": "Montelukast 10mg", "age_group": "18+", "dosage_amount": 10,
-     "dosage_unit": "mg", "frequency": "Once daily", "duration_days": 30,
-     "indication": "Asthma prophylaxis",
-     "special_notes": "10 mg once daily in the evening. Report any change in mood or behaviour."},
+    {"medicine_name": "Montelukast 10mg", "age_group": "6-12", "dosage_amount": 5, "dosage_unit": "mg", "frequency": "Once daily", "duration_days": 30, "indication": "Asthma prophylaxis", "special_notes": "5 mg chewable tablet once daily in the evening for children aged 6-14."},
 ]

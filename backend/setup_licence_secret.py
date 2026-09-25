@@ -68,6 +68,42 @@ def verifier_for(secret_bytes):
     return hashlib.sha256(secret_bytes).hexdigest()[:16]
 
 
+# --- Activation-token secret -------------------------------------------------
+# The one-time activation tokens (app/activation.py) use their own secret and
+# verifier, so that changing one scheme never invalidates licences issued under
+# the other. Provisioned here too, because "run setup twice" is a step that gets
+# forgotten and then a paid token cannot be verified.
+TOKEN_DIR = os.path.join(os.environ.get('LOCALAPPDATA', os.path.expanduser('~')),
+                         'PharmMS')
+TOKEN_FILE = os.path.join(TOKEN_DIR, 'token_secret.txt')
+
+
+def load_token_secret():
+    env = os.environ.get('PHARMS_TOKEN_SECRET')
+    if env:
+        return env.encode('utf-8')
+    if os.path.isfile(TOKEN_FILE):
+        with open(TOKEN_FILE, encoding='utf-8') as handle:
+            value = handle.read().strip()
+        if value:
+            return value.encode('utf-8')
+    return None
+
+
+def create_token_secret(force=False):
+    os.makedirs(TOKEN_DIR, exist_ok=True)
+    if os.path.exists(TOKEN_FILE) and not force:
+        return TOKEN_FILE, False
+    value = secrets.token_urlsafe(SECRET_BYTES)
+    with open(TOKEN_FILE, 'w', encoding='utf-8') as handle:
+        handle.write(value)
+    try:
+        os.chmod(TOKEN_FILE, stat.S_IREAD | stat.S_IWRITE)
+    except OSError:
+        pass
+    return TOKEN_FILE, True
+
+
 def main():
     import argparse
 
@@ -90,10 +126,18 @@ def main():
         print('')
         print('Pass this verifier to the build:')
         print(f'    .\\build_exe.ps1 -LicenceVerifier {verifier_for(secret)}')
+        token_secret = load_token_secret()
+        if token_secret:
+            print('')
+            print(f'Token file  : {TOKEN_FILE}')
+            print(f'Token verify: {verifier_for(token_secret)}')
+            print(f'    .\\build_exe.ps1 -TokenVerifier {verifier_for(token_secret)}')
         return 0
 
     path, created = create_secret(force=args.force)
     secret = load_secret()
+    token_path, token_created = create_token_secret(force=args.force)
+    token_secret = load_token_secret()
 
     if not created:
         print(f'A secret already exists at:')
@@ -101,19 +145,28 @@ def main():
         print('')
         print('Leaving it alone - replacing it would invalidate every key you')
         print('have already issued. Use --force only if that is what you want.')
+        if token_secret:
+            print('')
+            print(f'Activation tokens  : {TOKEN_FILE}')
+            print(f'Token verifier     : {verifier_for(token_secret)}')
+            if token_created:
+                print('   (created now - pass it to the build with -TokenVerifier)')
         return 0
 
     print('=' * 62)
-    print('  Licence signing secret created')
+    print('  Licence + activation-token secrets created')
     print('=' * 62)
-    print(f'  Location : {path}')
-    print(f'  Verifier : {verifier_for(secret)}')
+    print(f'  Key secret   : {path}')
+    print(f'  Key verifier : {verifier_for(secret)}')
+    print(f'  Token secret : {token_path}')
+    print(f'  Token verify : {verifier_for(token_secret) if token_secret else "-"}')
     print('')
-    print('  KEEP THIS FILE PRIVATE. It is stored outside the project so it')
-    print('  cannot be committed. Anyone holding it can mint licence keys.')
+    print('  KEEP THESE FILES PRIVATE. They are stored outside the project so')
+    print('  they cannot be committed. Anyone holding them can mint keys.')
     print('')
-    print('  Next: build the app with the verifier baked in -')
-    print(f'      .\\build_exe.ps1 -LicenceVerifier {verifier_for(secret)}')
+    print('  Next: build the app with the verifiers baked in -')
+    print(f'      .\\build_exe.ps1 -LicenceVerifier {verifier_for(secret)} `')
+    print(f'                      -TokenVerifier {verifier_for(token_secret) if token_secret else "<verifier>"}')
     print('=' * 62)
     return 0
 

@@ -52,6 +52,58 @@ ADDED_COLUMNS = [
     # fetched record is distinguishable from the authored reference set.
     ('medicines', 'data_source', 'VARCHAR(120)'),
     ('medicines', 'data_fetched_at', 'DATETIME'),
+
+    # Medicine images (v2.2). Stored as a file NAME inside the data directory's
+    # medicines/ folder, never an absolute path - the data directory differs per
+    # machine and per user, so a stored path would break on the next PC and would
+    # be a traversal vector when used to serve the file.
+    ('medicines', 'image_filename', 'VARCHAR(200)'),
+    ('medicines', 'image_source', 'VARCHAR(40)'),
+    ('medicines', 'image_attribution', 'VARCHAR(300)'),
+    ('medicines', 'image_fetched_at', 'DATETIME'),
+
+    # Prescription items: the dose time-of-day pattern (morning/afternoon/night)
+    # and the dispensed quantity, which the printed prescription shows as the
+    # M/A/N dosing dots and the receipt uses as the billed line.
+    ('prescription_items', 'dose_schedule', 'VARCHAR(40)'),
+    ('prescription_items', 'dispensed_units', 'INTEGER'),
+]
+
+
+# Tables that must exist for the app to run, created on a database that predates
+# them.
+#
+# WHY THIS EXISTS: db.create_all() only creates tables that are *absent*, and it
+# runs before this migration - so in principle a new model's table would be
+# created for free. In practice it is not, because create_all() leaves an
+# uncommitted transaction open on a pooled connection (the same defect described
+# at length in migrate() below), so the CREATE TABLE is rolled back and the file
+# never gains the table. The result was that "activation_tokens" was absent from
+# any database created before the model was added, and every request that touched
+# it - including GET /api/branding - failed with
+#     sqlite3.OperationalError: no such table: activation_tokens
+# so the splash screen and the branding page both 500'd on an upgraded install.
+#
+# These are created over the dedicated autocommit connection for the same reason
+# the ALTER TABLEs are, and the DDL is written out in full rather than derived
+# from the models, so a future change to a model cannot silently alter the
+# shape of an existing database.
+ADDED_TABLES = [
+    (
+        'activation_tokens',
+        """CREATE TABLE IF NOT EXISTS activation_tokens (
+            id INTEGER NOT NULL PRIMARY KEY,
+            body VARCHAR(64) NOT NULL UNIQUE,
+            token_display VARCHAR(80) NOT NULL,
+            pharmacy_name VARCHAR(200) NOT NULL,
+            note VARCHAR(200),
+            issued_at VARCHAR(40),
+            redeemed_at DATETIME,
+            machine VARCHAR(120)
+        )""",
+        'CREATE UNIQUE INDEX IF NOT EXISTS ix_activation_tokens_body '
+        'ON activation_tokens (body)',
+    ),
 ]
 
 
@@ -93,10 +145,21 @@ def _all_columns_present(database_path):
 
     A table that is absent counts as NOT migrated, so a brand-new database
     still runs the full path (where the table check safely skips it).
+
+    The tables in ADDED_TABLES are probed too. Without that the fast path would
+    report "nothing to do" on a database that is missing one of them and return
+    early, which is exactly how a missing activation_tokens table went unnoticed
+    on an upgraded install.
     """
     import sqlite3
     probe = sqlite3.connect(database_path, timeout=15)
     try:
+        def table_exists(name):
+            row = probe.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+                (name,)).fetchone()
+            return row is not None
+
         present = {}
         for table, column, _type in ADDED_COLUMNS:
             if table not in present:
@@ -105,6 +168,9 @@ def _all_columns_present(database_path):
                 # no columns" - both mean there is nothing to skip.
                 present[table] = {row[1] for row in rows}
             if column not in present[table]:
+                return False
+        for table, _create_sql, _index_sql in ADDED_TABLES:
+            if not table_exists(table):
                 return False
         return True
     finally:
@@ -201,6 +267,23 @@ def apply_migrations(db, logger=None):
                 if logger:
                     logger.warning(
                         'Migration skipped for %s.%s: %s', table, column, exc)
+
+        # --- Whole tables that predate the current models -------------------
+        # Checked before the columns above would ever help: a column cannot be
+        # added to a table that does not exist, and the column loop skips such
+        # an entry silently (``known[table] is None``), so a missing table was
+        # formerly invisible to this migration.
+        for table, create_sql, index_sql in ADDED_TABLES:
+            if table_present(table):
+                continue
+            try:
+                connection.execute(create_sql)
+                if index_sql:
+                    connection.execute(index_sql)
+                added.append('%s (table)' % table)
+            except Exception as exc:
+                if logger:
+                    logger.warning('Could not create table %s: %s', table, exc)
     finally:
         connection.close()
 

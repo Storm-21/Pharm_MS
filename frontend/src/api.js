@@ -147,6 +147,24 @@ export const apiClient = {
         adult_mg: options.adultMg,
         max_mg: options.maxMg,
         dose_per_m2: options.dosePerM2,
+        // Lets the prescriber pick the formula instead of the default route.
+        method: options.method,
+      }),
+    }),
+  // Every published formula at once, with a flag for each one that cannot be
+  // applied and why - so the panel can disable an option rather than hide it.
+  getDoseFormulas: (patientId, medicineId, options = {}) =>
+    request('/recommender/dose-formulas', {
+      method: 'POST',
+      body: JSON.stringify({
+        patient_id: patientId,
+        medicine_id: medicineId,
+        doses_per_day: options.dosesPerDay,
+        mg_per_kg: options.mgPerKg,
+        adult_mg: options.adultMg,
+        max_mg: options.maxMg,
+        dose_per_m2: options.dosePerM2,
+        combine: options.combine ? true : undefined,
       }),
     }),
   checkAllergies: (patientId, medicineId) =>

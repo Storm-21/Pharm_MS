@@ -81,6 +81,9 @@ def weight_dose():
         max_mg              explicit single-dose ceiling
         dose_per_m2         explicit per-m2 figure to force the BSA route
         doses_per_day       used for the daily ceiling check
+        method              optional - which formula the prescriber chose:
+                            'mg/kg' | 'bsa' | 'clark' | 'young' | 'age-band'
+                            Defaults to the automatic (evidence-ranked) route.
     """
     try:
         from app.services.weight_dosing_service import WeightDoser
@@ -132,6 +135,7 @@ def weight_dose():
             bsa_dose_per_m2=reference.get('dose_per_m2'),
             doses_per_day=doses_per_day,
             max_daily_dose_mg=daily_ceiling,
+            method=(data.get('method') or None),
         )
         if not result:
             return jsonify({
@@ -143,6 +147,90 @@ def weight_dose():
         result['patient_name'] = '%s %s' % (patient.first_name, patient.last_name)
         result['summary'] = WeightDoser.describe(result)
         return jsonify({'success': True, 'data': result})
+
+    except Exception as exc:
+        return jsonify({'success': False, 'error': str(exc)}), 400
+
+
+@recommender_bp.route('/dose-formulas', methods=['POST'])
+def dose_formulas():
+    """
+    Compute *every* published formula for a patient/medicine pair at once.
+
+    Why a separate endpoint: the prescriber often wants to see the alternatives
+    side by side rather than accept the automatic choice - a per-kg dose, the
+    BSA working, the Clark scaled adult dose and the age band disagree, and that
+    disagreement is clinically useful. Crucially, a formula that cannot be
+    applied (Clark with no weight, for example) is returned with a ``usable``
+    flag and an explicit reason rather than being omitted, so the UI can disable
+    it and say why instead of silently hiding an option.
+
+    Body:
+        patient_id          required
+        medicine_id         must exist
+        mg_per_kg / adult_mg / max_mg / dose_per_m2   optional overrides
+        doses_per_day       for the daily ceiling check
+        combine             when true, add a 'combined' block reporting the
+                            agreement between every usable formula
+    """
+    try:
+        from app.services.weight_dosing_service import WeightDoser
+        data = request.get_json() or {}
+
+        patient = Patient.query.get(data.get('patient_id'))
+        if not patient:
+            return jsonify({'success': False,
+                            'error': 'Patient not found.'}), 404
+
+        medicine = Medicine.query.get(data.get('medicine_id'))
+        if not medicine:
+            return jsonify({'success': False,
+                            'error': 'Medicine not found.'}), 404
+
+        from app.services.dosage_service import ADULT_REFERENCE_DOSE
+        key = (medicine.generic_name or '').strip().lower()
+        reference = dict(ADULT_REFERENCE_DOSE.get(key) or {})
+        for field in ('mg_per_kg', 'adult_mg', 'max_mg', 'dose_per_m2'):
+            if data.get(field) not in (None, ''):
+                reference[field] = float(data[field])
+
+        doses_per_day = int(data.get('doses_per_day') or 1)
+        daily_ceiling = None
+        try:
+            from app.services.safety_service import SafetyEngine
+            daily_ceiling = SafetyEngine.max_daily_dose(medicine)
+        except Exception:
+            daily_ceiling = None
+
+        formulas = WeightDoser.all_formulas(
+            patient,
+            reference,
+            bsa_dose_per_m2=reference.get('dose_per_m2'),
+            doses_per_day=doses_per_day,
+            max_daily_dose_mg=daily_ceiling,
+        )
+
+        payload = {
+            'patient_id': patient.id,
+            'patient_name': '%s %s' % (patient.first_name, patient.last_name),
+            'medicine_id': medicine.id,
+            'medicine_name': medicine.name,
+            'weight_kg': getattr(patient, 'weight_kg', None),
+            'height_cm': getattr(patient, 'height_cm', None),
+            'bsa_m2': patient.bsa_m2,
+            'age_years': patient.age,
+            'age_months': getattr(patient, 'age_months', None),
+            'doses_per_day': doses_per_day,
+            'total_stock': 0,
+            'formulas': formulas,
+        }
+
+        if data.get('combine'):
+            payload['combined'] = WeightDoser.combine(
+                formulas, doses_per_day=doses_per_day
+            )
+
+        return jsonify({'success': True, 'data': payload})
 
     except Exception as exc:
         return jsonify({'success': False, 'error': str(exc)}), 400

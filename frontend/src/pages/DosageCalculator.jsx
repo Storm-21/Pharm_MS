@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiClient } from '../api';
 import {
   Brain,
@@ -10,7 +10,45 @@ import {
   Info,
   Scale,
   Ruler,
+  Layers,
+  Check,
+  Slash,
 } from 'lucide-react';
+
+/**
+ * The formulas the prescriber may choose between.
+ *
+ * ``key`` matches the backend's formula key exactly, so selecting one here is
+ * the same instruction as passing ``method`` to /weight-dose. ``short`` is the
+ * one-line reason shown on the card, because "Clark's rule" alone tells a user
+ * nothing about whether it applies to their patient.
+ */
+const FORMULA_OPTIONS = [
+  {
+    key: 'mg/kg',
+    label: 'mg/kg',
+    title: 'Weight-based (mg/kg)',
+    short: 'The published paediatric method — dose per kilogram of body weight.',
+  },
+  {
+    key: 'bsa',
+    label: 'BSA',
+    title: 'Body surface area (Mosteller)',
+    short: 'Doses per square metre, from height and weight.',
+  },
+  {
+    key: 'clark',
+    label: "Clark's rule",
+    title: "Clark's rule",
+    short: 'The adult dose scaled by body weight (lb ÷ 150).',
+  },
+  {
+    key: 'young',
+    label: "Young's rule",
+    title: "Young's rule",
+    short: 'Adult dose scaled by age alone — ignores weight entirely.',
+  },
+];
 
 /**
  * Dosage calculator.
@@ -38,7 +76,57 @@ export function DosageCalculator() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  // Which formula the prescriber chose. 'auto' is the evidence-ranked default;
+  // 'all' asks for every formula at once with the agreement between them.
+  const [methodChoice, setMethodChoice] = useState('auto');
+  const [formulaData, setFormulaData] = useState(null);
+  const [combining, setCombining] = useState(false);
+
   const selectedPatient = patients.find((p) => String(p.id) === String(patientId)) || null;
+
+  // Fetch the whole formula set whenever the patient, medicine or dose count
+  // changes, so each option can be shown enabled or disabled-with-a-reason
+  // before the user commits to it. Selecting a formula is then instant: the
+  // numbers are already on screen.
+  const loadFormulas = useCallback(async () => {
+    if (!patientId || !medicineId) {
+      setFormulaData(null);
+      return;
+    }
+    setCombining(true);
+    try {
+      const res = await apiClient.getDoseFormulas(
+        Number(patientId),
+        Number(medicineId),
+        { dosesPerDay: Number(dosesPerDay) || undefined, combine: true }
+      );
+      setFormulaData(res && res.success ? res.data : null);
+    } catch (err) {
+      setFormulaData(null);
+    } finally {
+      setCombining(false);
+    }
+  }, [patientId, medicineId, dosesPerDay]);
+
+  useEffect(() => {
+    loadFormulas();
+  }, [loadFormulas]);
+
+  const formulas = useMemo(
+    () => (formulaData && formulaData.formulas) || [],
+    [formulaData]
+  );
+  const selectedFormula = useMemo(
+    () =>
+      formulas.find((f) => f.key === methodChoice) ||
+      formulas.find((f) => f.usable) ||
+      null,
+    [formulas, methodChoice]
+  );
+
+  // Only offer a method the backend reported as applicable; the rest are shown
+  // disabled with the reason, never silently dropped.
+  const usableCount = formulas.filter((f) => f.usable).length;
 
   useEffect(() => {
     Promise.all([apiClient.getPatients(), apiClient.getMedicines()])
@@ -61,7 +149,6 @@ export function DosageCalculator() {
     setDrugCycle(null);
     setSafety(null);
     setWeightDose(null);
-
     const pid = Number(patientId);
     const mid = Number(medicineId);
 
@@ -83,9 +170,14 @@ export function DosageCalculator() {
           apiClient.getDrugCycle(mid),
           apiClient.safetyScreen(pid, mid),
           // The full weight-based working, shown separately so the arithmetic
-          // is visible even when the stored guide supplied the dose.
+          // is visible even when the stored guide supplied the dose. The
+          // prescriber's chosen formula is passed through, so the manual and
+          // the automatic paths cannot disagree.
           apiClient
-            .calculateWeightDose(pid, mid, { dosesPerDay: Number(dosesPerDay) || undefined })
+            .calculateWeightDose(pid, mid, {
+              dosesPerDay: Number(dosesPerDay) || undefined,
+              method: methodChoice === 'auto' ? undefined : methodChoice,
+            })
             .catch(() => null),
         ]);
 
@@ -178,6 +270,85 @@ export function DosageCalculator() {
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
+        </div>
+
+        {/* --- Which formula to use --------------------------------------
+            Every published method is offered, each one shown with its own
+            arithmetic. A method whose inputs are missing (Clark with no weight
+            recorded) is shown disabled with the reason rather than hidden, so
+            the prescriber knows why it is unavailable instead of assuming the
+            option does not exist. "Compare all" works every formula at once
+            and reports how far apart they are. */}
+        <div className="mb-5 rounded-xl border border-gray-200 bg-gray-50/70 p-4">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <Layers className="h-4 w-4 text-blue-600" />
+              <h3 className="text-sm font-semibold text-gray-800">
+                Dosage formula
+              </h3>
+              {combining && (
+                <span className="flex items-center gap-1 text-xs text-gray-500">
+                  <Loader2 className="h-3 w-3 animate-spin" /> checking availability
+                </span>
+              )}
+            </div>
+            {patientId && medicineId && (
+              <span className="text-xs text-gray-500">
+                {usableCount} of {formulas.length || 4} formulas applicable to this
+                patient
+              </span>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {/* Automatic choice */}
+            <FormulaCard
+              active={methodChoice === 'auto'}
+              onClick={() => setMethodChoice('auto')}
+              title="Automatic (recommended)"
+              tag="auto"
+              description={
+                selectedFormula
+                  ? `Uses ${selectedFormula.method} — the strongest method whose inputs are on file.`
+                  : 'Uses the strongest method whose inputs are on file.'
+              }
+            />
+
+            {FORMULA_OPTIONS.map((option) => {
+              const found = formulas.find((f) => f.key === option.key);
+              // Before a patient/medicine pair is chosen nothing is known yet,
+              // so the cards stay selectable rather than showing as disabled.
+              const known = Boolean(formulaData);
+              const usable = !known || (found ? found.usable : false);
+              return (
+                <FormulaCard
+                  key={option.key}
+                  active={methodChoice === option.key}
+                  disabled={!usable}
+                  onClick={() => usable && setMethodChoice(option.key)}
+                  title={option.title}
+                  tag={option.label}
+                  description={option.short}
+                  reason={!usable && found ? found.reason : null}
+                  dose={found && found.usable ? found.dose : null}
+                  unit={found ? found.unit : 'mg'}
+                />
+              );
+            })}
+
+            {/* Compare every formula at once */}
+            <FormulaCard
+              active={methodChoice === 'all'}
+              onClick={() => setMethodChoice('all')}
+              title="Compare / combine all"
+              tag="all"
+              description="Works out every applicable formula and reports the agreement between them."
+            />
+          </div>
+
+          {methodChoice === 'all' && formulaData && formulaData.combined && (
+            <CombinedSummary combined={formulaData.combined} />
+          )}
         </div>
 
         <button
@@ -609,6 +780,146 @@ export function DosageCalculator() {
           )}
         </div>
       )}
+    </div>
+  );
+}
+/**
+ * One selectable dosage formula.
+ *
+ * A disabled card is never simply greyed out: it carries the backend's own
+ * reason ("The patient has no weight recorded."), because an option that
+ * refuses without explaining why is indistinguishable from a broken one.
+ */
+function FormulaCard({
+  active,
+  disabled,
+  onClick,
+  title,
+  tag,
+  description,
+  reason,
+  dose,
+  unit = 'mg',
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      title={reason || description}
+      className={`flex h-full flex-col rounded-lg border p-3 text-left transition ${
+        disabled
+          ? 'cursor-not-allowed border-dashed border-gray-200 bg-gray-100/60 opacity-70'
+          : active
+            ? 'border-blue-500 bg-white ring-2 ring-blue-500/25'
+            : 'border-gray-200 bg-white hover:border-blue-300 hover:shadow-sm'
+      }`}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <span className={`text-sm font-semibold ${disabled ? 'text-gray-500' : 'text-gray-800'}`}>
+          {title}
+        </span>
+        <span
+          className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border text-[10px] font-bold uppercase ${
+            disabled
+              ? 'border-gray-300 text-gray-400'
+              : active
+                ? 'border-blue-600 bg-blue-600 text-white'
+                : 'border-gray-300 text-gray-500'
+          }`}
+        >
+          {disabled ? <Slash className="h-3 w-3" /> : active ? <Check className="h-3 w-3" /> : tag.slice(0, 2)}
+        </span>
+      </div>
+
+      <p className={`mt-1 text-xs leading-relaxed ${disabled ? 'text-gray-400' : 'text-gray-500'}`}>
+        {description}
+      </p>
+
+      {dose != null && (
+        <p className="mt-2 text-lg font-bold text-blue-700">
+          {dose} <span className="text-sm font-medium text-blue-600">{unit}</span>
+        </p>
+      )}
+
+      {reason && (
+        <p className="mt-2 rounded bg-amber-50 px-2 py-1 text-[11px] leading-snug text-amber-800">
+          Not applicable — {reason}
+        </p>
+      )}
+    </button>
+  );
+}
+
+/**
+ * The "combine them all" verdict.
+ *
+ * It deliberately does not average the formulas. Averaging clinical doses has
+ * no published basis, so instead this states the spread and tells the
+ * prescriber which figure to prefer, leaving the judgement where it belongs.
+ */
+function CombinedSummary({ combined }) {
+  if (!combined) return null;
+
+  if (!combined.usable_count) {
+    return (
+      <p className="mt-3 rounded-lg border-l-4 border-amber-400 bg-amber-50 p-3 text-sm text-amber-800">
+        {combined.summary}
+      </p>
+    );
+  }
+
+  const tone = {
+    close: 'border-emerald-400 bg-emerald-50 text-emerald-800',
+    moderate: 'border-blue-400 bg-blue-50 text-blue-800',
+    wide: 'border-orange-400 bg-orange-50 text-orange-800',
+    // One formula is not agreement. Amber, and worded as a limitation, so it
+    // cannot be read as the green "close agreement" reassurance.
+    single: 'border-amber-400 bg-amber-50 text-amber-800',
+  }[combined.agreement] || 'border-gray-300 bg-gray-50 text-gray-800';
+
+  const headline =
+    combined.agreement === 'single'
+      ? `${combined.usable_count} formula applied — nothing to compare`
+      : `${combined.usable_count} formulas applied — spread ${combined.spread_mg} mg (${combined.spread_pct}%)`;
+
+  return (
+    <div className={`mt-3 rounded-lg border-l-4 p-3 ${tone}`}>
+      <p className="text-sm font-semibold">{headline}</p>
+      <p className="mt-1 text-sm">{combined.verdict}</p>
+
+      <div className="mt-3 overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="text-left opacity-70">
+              <th className="py-1 pr-3 font-semibold">Formula</th>
+              <th className="py-1 pr-3 font-semibold">Single dose</th>
+              <th className="py-1 font-semibold">Daily total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {combined.daily_totals.map((row) => (
+              <tr key={row.method} className="border-t border-black/5">
+                <td className="py-1 pr-3">
+                  {row.method}
+                  {row.method === combined.reference_method && (
+                    <span className="ml-2 rounded bg-white/70 px-1.5 py-0.5 text-[10px] font-semibold uppercase">
+                      preferred
+                    </span>
+                  )}
+                </td>
+                <td className="py-1 pr-3 font-medium">{row.single} mg</td>
+                <td className="py-1 font-medium">
+                  {row.daily} mg
+                  {row.capped && (
+                    <span className="ml-2 text-[10px] uppercase opacity-80">capped</span>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

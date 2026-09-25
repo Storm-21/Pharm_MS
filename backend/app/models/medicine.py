@@ -72,6 +72,21 @@ class Medicine(db.Model):
     expiry_date = db.Column(db.Date, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+    # --- Image / pack shot ----------------------------------------------------
+    # A local file name inside the data directory's medicines/ folder. Stored as
+    # a NAME, not a path, for two reasons: the data directory moves between
+    # machines (LOCALAPPDATA differs per user), and a stored absolute path would
+    # be a path-traversal vector the moment it is used to serve a file.
+    #
+    # image_source records where it came from - 'upload', 'fetch', or 'url' -
+    # so an image pulled from the web is distinguishable from one the pharmacy
+    # supplied, and image_attribution keeps the credit line that a fetched image
+    # may require.
+    image_filename = db.Column(db.String(200), nullable=True)
+    image_source = db.Column(db.String(40), nullable=True)
+    image_attribution = db.Column(db.String(300), nullable=True)
+    image_fetched_at = db.Column(db.DateTime, nullable=True)
+
     # Integrity seal - see app/security.py
     record_hash = db.Column(db.String(128), nullable=True)
     content_seal = db.Column(db.String(128), nullable=True)
@@ -129,6 +144,9 @@ class Medicine(db.Model):
             'requires_prescription': self.requires_prescription,
             'storage_temp': self.storage_temp,
             'expiry_date': self.expiry_date.isoformat() if self.expiry_date else None,
+            'has_image': bool(self.image_filename),
+            'image_source': self.image_source,
+            'image_attribution': self.image_attribution,
         }
         if include_seal:
             data['record_hash'] = self.record_hash

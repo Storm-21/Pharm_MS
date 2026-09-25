@@ -1,15 +1,31 @@
 ﻿# Build PharmMS-Setup.exe and attach it to a GitHub Release.
 #
 # TRIGGERS
-#   * pushing a tag like v2.0.0  -> builds and publishes a Release
+#   * pushing a tag like v2.2.0  -> builds and publishes a Release
 #   * manual run from the Actions tab (Actions -> Build installer -> Run workflow)
 #
+# WHAT SHIPS
+#   Two files, always together, in the same release:
+#     PharmMS-Setup.exe  a small (~65 KB) bootstrapper - what the user downloads
+#     PharmMS.exe        the ~15 MB application payload
+#
+#   The bootstrapper carries no application code. At install time it downloads
+#   the payload from this same release over HTTPS, checks it against a SHA-256
+#   compiled into itself, and only then installs it. The user's download is
+#   therefore a few hundred kilobytes rather than fifteen megabytes, and a
+#   tampered or truncated payload is refused rather than installed.
+#
+#   Uploading the bootstrapper WITHOUT the payload produces an installer that
+#   downloads fine and then fails its own integrity check, so the two are
+#   published together and `verify_bootstrapper.ps1` asserts that the hash baked
+#   into the bootstrapper matches the payload actually built here. Building them
+#   out of order is a mistake that was made while developing this, and it would
+#   be invisible until a customer tried to install.
+#
 # WHY THIS EXISTS
-#   Building the installer needs Python, PyInstaller, Node and Windows. Doing it
-#   here means a release is reproducible from the tagged source alone: a visitor
-#   never has to build anything, they just download the .exe attached to the
-#   Release. It also means the machine that develops the app does not have to be
-#   the machine that ships it.
+#   Building needs Python, PyInstaller, Node and Windows. Doing it here means a
+#   release is reproducible from the tagged source alone: a visitor never has to
+#   build anything, they just download the .exe attached to the Release.
 #
 # NO SECRETS ARE NEEDED
 #   The workflow uses the automatic GITHUB_TOKEN to create the Release. Patient
@@ -77,6 +93,28 @@ jobs:
         shell: pwsh
         run: npm ci
 
+      # Run the suites before building anything. A release that ships a failing
+      # build is worse than a delayed one, and these are the checks that caught
+      # the missing-table migration, the duplicate catalogue entries and the
+      # orphan dosage guides.
+      - name: Run the test suites
+        working-directory: backend
+        shell: pwsh
+        run: |
+          $failed = @()
+          foreach ($t in @('test_catalogue.py', 'test_weight_dosing.py',
+                           'test_safety.py', 'test_migration.py',
+                           'test_endpoints.py')) {
+            Write-Host "=== $t ==="
+            .\venv\Scripts\python.exe $t
+            if ($LASTEXITCODE -ne 0) { $failed += $t }
+          }
+          if ($failed.Count -gt 0) {
+            Write-Host "::error::Test failures: $($failed -join ', ')"
+            exit 1
+          }
+          Write-Host 'All suites passed.'
+
       # Build, and capture the full output into the job summary.
       #
       # WHY: a failed run's log is only reachable through an authenticated
@@ -85,14 +123,14 @@ jobs:
       # CI failure impossible to diagnose from the command line, which is where
       # the fix has to be written. The step summary is readable without signing
       # in, so the reason for a failure is visible to anyone looking at the run.
-      - name: Build the application and the installer
+      - name: Build the application and the bootstrapper
         working-directory: backend
         shell: pwsh
         run: |
           # Redirect the build's own streams to a file. A transcript does not
           # flush when the script exits on a terminating error, which is exactly
           # the case worth capturing.
-          .\build_installer.ps1 *> build.log
+          .\build_bootstrapper.ps1 *> build.log
           $code = $LASTEXITCODE
           $text = Get-Content build.log -Raw -ErrorAction SilentlyContinue
           if (-not $text) { $text = '(no output captured)' }
@@ -115,27 +153,55 @@ jobs:
           }
 
           if (-not (Test-Path 'dist/PharmMS-Setup.exe')) {
-            Write-Host '::error::Installer was not produced.'
+            Write-Host '::error::Bootstrapper was not produced.'
             exit 1
           }
 
-      - name: Verify the installer was produced
+      # The hash gate is the one safety property of a web bootstrapper: it
+      # downloads the payload over HTTPS and then checks it against a SHA-256
+      # compiled into the installer. If the two files are ever built out of
+      # order, that hash is stale and EVERY install would fail its integrity
+      # check - a release that downloads perfectly and refuses to install.
+      # This was a real mistake made while developing it, so it is asserted here.
+      - name: Verify the bootstrapper and payload agree
+        working-directory: backend
+        shell: pwsh
+        run: .\verify_bootstrapper.ps1
+
+      - name: Verify both artifacts were produced
         working-directory: backend
         shell: pwsh
         run: |
-          $exe = 'dist\PharmMS-Setup.exe'
-          if (-not (Test-Path $exe)) { throw "Installer missing: $exe" }
-          $mb = [math]::Round((Get-Item $exe).Length / 1MB, 1)
-          if ($mb -lt 5) { throw "Installer looks too small ($mb MB) - build likely failed." }
-          Write-Host "Installer built: $mb MB"
+          $setup = 'dist\PharmMS-Setup.exe'
+          $payload = 'dist\PharmMS.exe'
+          if (-not (Test-Path $setup)) { throw "Bootstrapper missing: $setup" }
+          if (-not (Test-Path $payload)) { throw "Payload missing: $payload" }
 
-      # Keep the artefact on the run itself, so it can be downloaded even when
-      # no release was created (a manual dispatch, or a non-tag build).
-      - name: Upload the installer as a build artefact
+          $setupKb = [math]::Round((Get-Item $setup).Length / 1KB, 1)
+          $payloadMb = [math]::Round((Get-Item $payload).Length / 1MB, 1)
+
+          # The whole point of the bootstrapper is that it is small. If it is
+          # megabytes, something has gone back to embedding the payload and the
+          # download users click has silently become large again.
+          if ($setupKb -gt 2000) {
+            throw "Bootstrapper is $setupKb KB - it should be a few hundred KB, not embed the payload."
+          }
+          if ($payloadMb -lt 5) {
+            throw "Payload looks too small ($payloadMb MB) - build likely failed."
+          }
+
+          Write-Host "Bootstrapper: $setupKb KB"
+          Write-Host "Payload:      $payloadMb MB"
+
+      # Keep both artifacts on the run itself, so they can be downloaded even
+      # when no release was created (a manual dispatch, or a non-tag build).
+      - name: Upload the artifacts
         uses: actions/upload-artifact@v4
         with:
           name: PharmMS-Setup
-          path: backend/dist/PharmMS-Setup.exe
+          path: |
+            backend/dist/PharmMS-Setup.exe
+            backend/dist/PharmMS.exe
           if-no-files-found: error
 
       - name: Publish the GitHub Release
@@ -145,7 +211,6 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $tag = if ('${{ inputs.release_tag }}') { '${{ inputs.release_tag }}' } else { '${{ github.ref_name }}' }
-          $exe = 'backend/dist/PharmMS-Setup.exe'
 
           # Create the release if it does not exist yet; otherwise reuse it so
           # re-running the workflow is safe.
@@ -154,7 +219,14 @@ jobs:
             gh release create $tag --title "PharmMS $tag" --generate-notes
           }
 
-          # Replace any previous asset of the same name.
-          gh release upload $tag $exe --clobber
+          # BOTH files go to the same release. The small .exe is what the landing
+          # page links to and what the user downloads; it then fetches the
+          # payload from the same release by URL. Uploading the bootstrapper
+          # without the payload produces an installer that fails its own
+          # integrity check, so they are always published together.
+          gh release upload $tag `
+            'backend/dist/PharmMS-Setup.exe' `
+            'backend/dist/PharmMS.exe' `
+            --clobber
 
-          Write-Host "Release $tag now carries PharmMS-Setup.exe"
+          Write-Host "Release $tag now carries PharmMS-Setup.exe (bootstrapper) and PharmMS.exe (payload)."

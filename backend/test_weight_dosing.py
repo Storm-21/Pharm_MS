@@ -185,5 +185,148 @@ class SafetyTests(unittest.TestCase):
         self.assertIn('Weight-based', line)
 
 
+class ExplicitMethodTests(unittest.TestCase):
+    """The prescriber may name the formula instead of taking the default.
+
+    The bug these guard against: ``calculate`` set ``method = None`` while
+    selecting its route, which overwrote the parameter of the same name before
+    it was ever read. Every explicit choice was therefore silently ignored and
+    the automatic route was used - a prescriber asking for Clark's rule got the
+    mg/kg dose, with nothing on screen to say the request had been dropped.
+    """
+
+    def setUp(self):
+        self.patient = FakePatient(age=8, weight_kg=24.5, height_cm=132)
+        self.reference = {
+            'adult_mg': 500, 'mg_per_kg': 15, 'max_mg': 1000,
+        }
+
+    def test_requested_method_is_honoured(self):
+        result = WeightDoser.calculate(
+            self.patient, self.reference, method='clark')
+        self.assertEqual(result['route'], 'clark')
+        self.assertIn("Clark's rule", result['method'])
+        # Clark on a 24.5 kg child: 500 x (54.01 / 150) = 180.04 mg, which is
+        # quite different from the 367.5 mg the mg/kg route gives. The point of
+        # the test is that the number CHANGED, not merely the label.
+        self.assertAlmostEqual(result['dose'], 180.04, places=1)
+
+    def test_mg_per_kg_string_is_accepted(self):
+        result = WeightDoser.calculate(
+            self.patient, self.reference, method='mg/kg')
+        self.assertEqual(result['route'], 'weight')
+
+    def test_bsa_needs_a_per_m2_figure(self):
+        # BSA selected but no per-m2 dose supplied: fall back, and say so.
+        result = WeightDoser.calculate(
+            self.patient, self.reference, method='bsa')
+        self.assertNotEqual(result['route'], 'bsa')
+        self.assertTrue(
+            any('bsa' in w.lower() for w in result['warnings']),
+            result['warnings'])
+
+    def test_unknown_method_warns_instead_of_failing(self):
+        result = WeightDoser.calculate(
+            self.patient, self.reference, method='homeopathy')
+        self.assertTrue(any('Unknown dose method' in w for w in result['warnings']))
+        # It still returns a usable dose from the default route rather than
+        # refusing to calculate at all.
+        self.assertGreater(result['dose'], 0)
+
+    def test_method_with_missing_inputs_explains_itself(self):
+        # No weight on file, so Clark cannot be applied. The dose must still be
+        # produced by a route that works, and the warning must say why.
+        patient = FakePatient(age=8, weight_kg=None, height_cm=None)
+        result = WeightDoser.calculate(patient, self.reference, method='clark')
+        self.assertNotEqual(result['route'], 'clark')
+        self.assertTrue(
+            any('Clark' in w or 'clark' in w for w in result['warnings']),
+            result['warnings'])
+
+
+class AllFormulasTests(unittest.TestCase):
+    """Every formula at once, for the choose-one-or-compare-all panel."""
+
+    def setUp(self):
+        self.patient = FakePatient(age=8, weight_kg=24.5, height_cm=132)
+        self.reference = {
+            'adult_mg': 500, 'mg_per_kg': 15, 'max_mg': 1000,
+        }
+
+    def test_every_formula_is_returned_even_when_unusable(self):
+        # A formula that cannot be applied must still come back, flagged, with a
+        # reason. Dropping it would leave the UI unable to explain why the
+        # option is absent - which reads as a bug to the person using it.
+        patient = FakePatient(age=8, weight_kg=None, height_cm=None)
+        formulas = WeightDoser.all_formulas(patient, self.reference)
+        self.assertEqual(len(formulas), len(WeightDoser.FORMULA_SPECS))
+        for f in formulas:
+            if not f['usable']:
+                self.assertTrue(f['reason'], 'no reason given for %s' % f['key'])
+                self.assertIsNone(f['dose'])
+
+    def test_mg_per_kg_and_clark_are_both_computed(self):
+        formulas = WeightDoser.all_formulas(self.patient, self.reference)
+        by_key = {f['key']: f for f in formulas}
+        self.assertTrue(by_key['mg/kg']['usable'])
+        self.assertAlmostEqual(by_key['mg/kg']['dose'], 367.5, places=1)
+        self.assertTrue(by_key['clark']['usable'])
+        self.assertAlmostEqual(by_key['clark']['dose'], 180.04, places=1)
+
+    def test_formula_without_a_reference_dose_is_disabled_with_a_reason(self):
+        formulas = WeightDoser.all_formulas(self.patient, {})
+        for f in formulas:
+            self.assertFalse(f['usable'])
+            self.assertTrue(f['reason'])
+
+    def test_combine_reports_a_spread_not_an_average(self):
+        # The combined view must never invent a midpoint: no published method
+        # produces the average of two others, so presenting one would be
+        # fabricating a dose.
+        formulas = WeightDoser.all_formulas(self.patient, self.reference)
+        combined = WeightDoser.combine(formulas, doses_per_day=3)
+        self.assertGreaterEqual(combined['usable_count'], 2)
+        self.assertAlmostEqual(combined['lowest'], 180.04, places=1)
+        self.assertAlmostEqual(combined['highest'], 367.5, places=1)
+        self.assertNotIn('average', combined['verdict'].lower())
+        self.assertNotIn(
+            round(sum(combined['doses']) / len(combined['doses']), 1),
+            combined['doses'],
+        )
+
+    def test_one_formula_is_not_reported_as_agreement(self):
+        # With no weight, only Young's rule applies. Saying it "agrees" would
+        # present an age estimate as corroborated when nothing corroborated it.
+        patient = FakePatient(age=8, weight_kg=None, height_cm=None)
+        formulas = WeightDoser.all_formulas(patient, self.reference)
+        combined = WeightDoser.combine(formulas, doses_per_day=3)
+        self.assertEqual(combined['usable_count'], 1)
+        self.assertEqual(combined['agreement'], 'single')
+        self.assertIn('nothing to compare', combined['verdict'].lower())
+
+    def test_nothing_usable_is_reported_plainly(self):
+        combined = WeightDoser.combine(WeightDoser.all_formulas(
+            FakePatient(age=8, weight_kg=None, height_cm=None), {}))
+        self.assertEqual(combined['usable_count'], 0)
+        self.assertIn('No formula', combined['summary'])
+
+    def test_ceilings_are_applied_per_formula(self):
+        # A comparison between a capped and an uncapped figure would be
+        # meaningless, so each formula is capped independently.
+        reference = {'adult_mg': 1000, 'mg_per_kg': 100, 'max_mg': 500}
+        formulas = WeightDoser.all_formulas(self.patient, reference)
+        for f in formulas:
+            if f['usable']:
+                self.assertLessEqual(f['dose'], 500)
+
+    def test_high_doses_are_flagged_as_capped(self):
+        reference = {'adult_mg': 1000, 'mg_per_kg': 100, 'max_mg': 500}
+        formulas = WeightDoser.all_formulas(self.patient, reference)
+        by_key = {f['key']: f for f in formulas}
+        # 100 mg/kg x 24.5 kg = 2450 mg, well above the 500 mg ceiling.
+        self.assertTrue(by_key['mg/kg']['capped'])
+        self.assertTrue(by_key['mg/kg']['caps_applied'])
+
+
 if __name__ == '__main__':
     unittest.main(verbosity=2)

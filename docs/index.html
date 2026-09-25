@@ -415,14 +415,16 @@
  <div class="wrap download-inner">
     <h2>Download and install</h2>
     <ol class="steps">
-      <li>Download <strong>PharmMS-Setup.exe</strong> below.</li>
+      <li>Download <strong>PharmMS-Setup.exe</strong> below - it is about 65 KB.</li>
       <li>Double-click it and click <strong>Install</strong>.</li>
+      <li>It fetches the application from GitHub (about 15 MB), verifies it, and installs it.</li>
       <li>Open PharmMS from the Desktop or Start Menu shortcut.</li>
     </ol>
 
     <p class="micro">
-      That is the whole process. No Python, no Node.js, no administrator rights,
-      and no internet connection required at any point.
+      No Python, no Node.js and no administrator rights. An internet connection
+      is needed for step 3 only - once installed, the application is fully
+      offline.
     </p>
 
     <a class="btn btn-primary btn-large"
@@ -433,6 +435,23 @@
     <p class="micro">
       <a href="https://github.com/Storm-21/Pharm_MS/releases/latest" target="_blank" rel="noopener">All releases and version history</a>
     </p>
+
+    <div class="notice notice-info">
+      <h3>Why the download is so small</h3>
+      <p>
+        The setup file does not contain the application. It knows where to get
+        it, downloads it from the release over HTTPS, and checks the download
+        against a <strong>SHA-256 hash compiled into the setup file itself</strong>
+        before writing anything to disk. A truncated or tampered download fails
+        that check and is refused rather than installed.
+      </p>
+      <p>
+        That is why the setup file is a few hundred kilobytes instead of fifteen
+        megabytes - and why the hash mismatch message, if you ever see it, means
+        the download was corrupted in transit and nothing was changed on your
+        computer.
+      </p>
+    </div>
 
     <div class="notice">
       <h3>Windows SmartScreen</h3>

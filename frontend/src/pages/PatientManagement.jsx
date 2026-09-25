@@ -15,6 +15,9 @@ import {
   FileText,
   Printer,
   X,
+  User,
+  Stethoscope,
+  MapPinned,
 } from 'lucide-react';
 import { apiClient } from '../api';
 
@@ -92,6 +95,48 @@ const toPayload = (form) => {
  * pulls the patient's allergies, prescription history and condition-based
  * medicine suggestions from /patients/:id/profile.
  */
+
+// Shared input styling so every control in the form lines up and highlights
+// the same way on focus.
+const INPUT_CLASS =
+  'w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-900 ' +
+  'transition focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30';
+
+/** A titled block of related fields, so the form reads as sections not a wall. */
+function FormSection({ icon, title, hint, tone = 'gray', children }) {
+  const tones = {
+    gray: 'border-gray-200 bg-white',
+    blue: 'border-blue-100 bg-blue-50/50',
+  };
+  return (
+    <section className={`rounded-xl border p-4 ${tones[tone] || tones.gray}`}>
+      <header className="mb-3">
+        <h3 className="flex items-center gap-2 text-sm font-semibold text-gray-800">
+          <span className="flex h-6 w-6 items-center justify-center rounded-md bg-blue-600/10 text-blue-700">
+            {icon}
+          </span>
+          {title}
+        </h3>
+        {hint && <p className="mt-0.5 text-xs text-gray-500">{hint}</p>}
+      </header>
+      <div className="space-y-4">{children}</div>
+    </section>
+  );
+}
+
+/** One labelled control with an optional hint underneath. */
+function Field({ label, hint, required, children }) {
+  return (
+    <div>
+      <label className="mb-1 block text-sm font-medium text-gray-700">
+        {label} {required && <span className="text-red-500">*</span>}
+      </label>
+      {children}
+      {hint && <p className="mt-1 text-xs text-gray-500">{hint}</p>}
+    </div>
+  );
+}
+
 export function PatientManagement() {
   const { patientId } = useParams();
   const navigate = useNavigate();
@@ -628,65 +673,155 @@ export function PatientManagement() {
 
       {/* --- Add / edit modal ------------------------------------------------ */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-lg bg-white p-6">
-            <h2 className="mb-6 text-2xl font-bold">
-              {editingId ? 'Edit patient' : 'Add new patient'}
-            </h2>
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                {[
-                  { key: 'first_name', label: 'First name', required: true },
-                  { key: 'last_name', label: 'Last name', required: true },
-                  { key: 'email', label: 'Email', type: 'email' },
-                  { key: 'phone', label: 'Phone', type: 'tel' },
-                  { key: 'date_of_birth', label: 'Date of birth', type: 'date', required: true },
-                  { key: 'city', label: 'City' },
-                  { key: 'country', label: 'Country' },
-                ].map((field) => (
-                  <div key={field.key}>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
-                      {field.label} {field.required && '*'}
-                    </label>
-                    <input
-                      type={field.type || 'text'}
-                      required={field.required}
-                      value={formData[field.key] || ''}
-                      onChange={(e) => setFormData({ ...formData, [field.key]: e.target.value })}
-                      className="w-full rounded-lg border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                ))}
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 sm:p-6">
+          <div className="w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+            {/* Sticky header: the form is long, so the title and the close
+                button stay reachable while it is scrolled. */}
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-100 bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4">
+              <div className="flex items-center gap-3">
+                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white/15 ring-1 ring-white/30">
+                  <User className="h-5 w-5 text-white" />
+                </span>
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-gray-700">Gender *</label>
-                  <select
-                    required
-                    value={formData.gender}
-                    onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
-                    className="w-full rounded-lg border-gray-300 px-3 py-2"
-                  >
-                    <option>Male</option>
-                    <option>Female</option>
-                    <option>Other</option>
-                  </select>
+                  <h2 className="text-lg font-bold leading-tight text-white">
+                    {editingId ? 'Edit patient' : 'New patient'}
+                  </h2>
+                  <p className="text-xs text-blue-100">
+                    {editingId
+                      ? 'Update the record — changes are saved when you submit.'
+                      : 'Fields marked * are required. Everything else unlocks safer dosing.'}
+                  </p>
                 </div>
               </div>
+              <button
+                type="button"
+                onClick={() => setShowModal(false)}
+                className="rounded-full p-1.5 text-blue-100 transition hover:bg-white/15 hover:text-white"
+                aria-label="Close"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-6 p-6">
+              {/* --- Identity --------------------------------------------- */}
+              <FormSection
+                icon={<User className="h-4 w-4" />}
+                title="Identity"
+                hint="How the patient is identified on prescriptions and reports."
+              >
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <Field label="First name" required>
+                    <input
+                      required
+                      autoFocus
+                      value={formData.first_name || ''}
+                      onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
+                      placeholder="e.g. Anita"
+                      className={INPUT_CLASS}
+                    />
+                  </Field>
+                  <Field label="Last name" required>
+                    <input
+                      required
+                      value={formData.last_name || ''}
+                      onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
+                      placeholder="e.g. Deshmukh"
+                      className={INPUT_CLASS}
+                    />
+                  </Field>
+                  <Field label="Date of birth" required>
+                    <input
+                      type="date"
+                      required
+                      value={formData.date_of_birth || ''}
+                      onChange={(e) => setFormData({ ...formData, date_of_birth: e.target.value })}
+                      className={INPUT_CLASS}
+                    />
+                  </Field>
+                  <Field label="Gender" required>
+                    <select
+                      required
+                      value={formData.gender}
+                      onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
+                      className={INPUT_CLASS}
+                    >
+                      <option>Male</option>
+                      <option>Female</option>
+                      <option>Other</option>
+                    </select>
+                  </Field>
+                </div>
+              </FormSection>
+
+              {/* --- Contact ----------------------------------------------- */}
+              <FormSection
+                icon={<MapPinned className="h-4 w-4" />}
+                title="Contact"
+                hint="Used only to identify the patient at the counter."
+              >
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <Field label="Phone" hint={formData.phone ? undefined : 'Optional — helps match duplicates'}>
+                    <input
+                      type="tel"
+                      value={formData.phone || ''}
+                      onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                      placeholder="e.g. 98765 43210"
+                      className={INPUT_CLASS}
+                    />
+                  </Field>
+                  <Field label="Email" hint="Optional">
+                    <input
+                      type="email"
+                      value={formData.email || ''}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      placeholder="e.g. anita@example.com"
+                      className={INPUT_CLASS}
+                    />
+                  </Field>
+                  <Field label="City">
+                    <input
+                      value={formData.city || ''}
+                      onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                      className={INPUT_CLASS}
+                    />
+                  </Field>
+                  <Field label="Country">
+                    <input
+                      value={formData.country || ''}
+                      onChange={(e) => setFormData({ ...formData, country: e.target.value })}
+                      className={INPUT_CLASS}
+                    />
+                  </Field>
+                  <div className="md:col-span-2">
+                    <Field label="Address">
+                      <input
+                        value={formData.address || ''}
+                        onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                        placeholder="Street, area, landmark"
+                        className={INPUT_CLASS}
+                      />
+                    </Field>
+                  </div>
+                </div>
+              </FormSection>
 
               {/* --- Body measurements -------------------------------------
                   Weight is the single most important field for safe dosing:
                   every paediatric mg/kg calculation needs it, and without it
                   the calculator can only fall back to an age formula. It is
                   therefore on the form rather than hidden in the API. */}
-              <fieldset className="rounded-lg border border-blue-100 bg-blue-50/50 p-4">
-                <legend className="px-1 text-sm font-semibold text-gray-800">
-                  Body measurements (used for dosage calculation)
-                </legend>
+              <FormSection
+                icon={<Stethoscope className="h-4 w-4" />}
+                title="Body measurements"
+                hint="These drive the weight-based dosage calculator. Without a weight it can only fall back to a coarse age formula."
+                tone="blue"
+              >
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
-                      Weight (kg)
-                    </label>
+                  <Field
+                    label="Weight (kg)"
+                    hint="Required for a weight-based (mg/kg) paediatric dose."
+                  >
                     <input
                       type="number"
                       step="0.1"
@@ -694,16 +829,10 @@ export function PatientManagement() {
                       value={formData.weight_kg}
                       onChange={(e) => setFormData({ ...formData, weight_kg: e.target.value })}
                       placeholder="e.g. 24.5"
-                      className="w-full rounded-lg border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className={INPUT_CLASS}
                     />
-                    <p className="mt-1 text-xs text-gray-500">
-                      Required for a weight-based (mg/kg) paediatric dose.
-                    </p>
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
-                      Height (cm)
-                    </label>
+                  </Field>
+                  <Field label="Height (cm)" hint="Used for body surface area and BMI.">
                     <input
                       type="number"
                       step="0.1"
@@ -711,14 +840,10 @@ export function PatientManagement() {
                       value={formData.height_cm}
                       onChange={(e) => setFormData({ ...formData, height_cm: e.target.value })}
                       placeholder="e.g. 132"
-                      className="w-full rounded-lg border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className={INPUT_CLASS}
                     />
-                    <p className="mt-1 text-xs text-gray-500">Used for body surface area and BMI.</p>
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
-                      Serum creatinine (mg/dL)
-                    </label>
+                  </Field>
+                  <Field label="Serum creatinine (mg/dL)" hint="Enables eGFR and renal dose checks.">
                     <input
                       type="number"
                       step="0.01"
@@ -726,28 +851,27 @@ export function PatientManagement() {
                       value={formData.serum_creatinine}
                       onChange={(e) => setFormData({ ...formData, serum_creatinine: e.target.value })}
                       placeholder="e.g. 0.9"
-                      className="w-full rounded-lg border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className={INPUT_CLASS}
                     />
-                    <p className="mt-1 text-xs text-gray-500">Enables eGFR and renal dose checks.</p>
-                  </div>
-                  <div>
-                    <label className="mb-1 block text-sm font-medium text-gray-700">
-                      Pregnancy trimester
-                    </label>
+                  </Field>
+                  <Field
+                    label="Pregnancy trimester"
+                    hint={formData.is_pregnant ? undefined : 'Tick “Pregnant” below to enable this.'}
+                  >
                     <select
                       value={formData.pregnancy_trimester}
                       onChange={(e) =>
                         setFormData({ ...formData, pregnancy_trimester: e.target.value })
                       }
                       disabled={!formData.is_pregnant}
-                      className="w-full rounded-lg border-gray-300 px-3 py-2 disabled:bg-gray-100 disabled:text-gray-400"
+                      className={`${INPUT_CLASS} disabled:bg-gray-100 disabled:text-gray-400`}
                     >
                       <option value="">Not applicable</option>
                       <option value="1">1st trimester</option>
                       <option value="2">2nd trimester</option>
                       <option value="3">3rd trimester</option>
                     </select>
-                  </div>
+                  </Field>
                 </div>
 
                 <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4">
@@ -759,7 +883,11 @@ export function PatientManagement() {
                   ].map((flag) => (
                     <label
                       key={flag.key}
-                      className="flex items-center gap-2 rounded border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700"
+                      className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition ${
+                        formData[flag.key]
+                          ? 'border-blue-400 bg-blue-50 text-blue-800'
+                          : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300'
+                      }`}
                     >
                       <input
                         type="checkbox"
@@ -773,66 +901,63 @@ export function PatientManagement() {
                     </label>
                   ))}
                 </div>
-              </fieldset>
+              </FormSection>
 
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
-                  Chronic conditions (comma separated)
-                </label>
-                <input
-                  value={formData.chronic_diseases || ''}
-                  onChange={(e) => setFormData({ ...formData, chronic_diseases: e.target.value })}
-                  placeholder="e.g. Diabetes, Hypertension, Asthma"
-                  className="w-full rounded-lg border-gray-300 px-3 py-2"
-                />
-                <p className="mt-1 text-xs text-gray-500">
-                  These drive the condition-based medicine suggestions in the patient record.
-                </p>
-              </div>
+              {/* --- History and safety ------------------------------------ */}
+              <FormSection
+                icon={<Heart className="h-4 w-4" />}
+                title="History and safety"
+                hint="Used by the interaction screener and the condition-based suggestions."
+              >
+                <Field label="Chronic conditions" hint="Comma separated — e.g. Diabetes, Hypertension, Asthma">
+                  <input
+                    value={formData.chronic_diseases || ''}
+                    onChange={(e) => setFormData({ ...formData, chronic_diseases: e.target.value })}
+                    placeholder="e.g. Diabetes, Hypertension, Asthma"
+                    className={INPUT_CLASS}
+                  />
+                </Field>
 
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
-                  Current medications (comma separated)
-                </label>
-                <input
-                  value={formData.current_medications || ''}
-                  onChange={(e) => setFormData({ ...formData, current_medications: e.target.value })}
-                  placeholder="e.g. Metformin, Lisinopril"
-                  className="w-full rounded-lg border-gray-300 px-3 py-2"
-                />
-                <p className="mt-1 text-xs text-gray-500">
-                  Used for drug interaction screening.
-                </p>
-              </div>
+                <Field label="Current medications" hint="Comma separated — screened for interactions">
+                  <input
+                    value={formData.current_medications || ''}
+                    onChange={(e) => setFormData({ ...formData, current_medications: e.target.value })}
+                    placeholder="e.g. Metformin, Lisinopril"
+                    className={INPUT_CLASS}
+                  />
+                </Field>
 
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
-                  Free-text allergy notes
-                </label>
-                <textarea
-                  rows="2"
-                  value={formData.allergies_description || ''}
-                  onChange={(e) => setFormData({ ...formData, allergies_description: e.target.value })}
-                  placeholder="Anything not captured by structured allergy entries"
-                  className="w-full rounded-lg border-gray-300 px-3 py-2"
-                />
-              </div>
+                <Field
+                  label="Allergy notes"
+                  hint="Free text — structured allergy entries are added from the patient record afterwards"
+                >
+                  <textarea
+                    rows="2"
+                    value={formData.allergies_description || ''}
+                    onChange={(e) =>
+                      setFormData({ ...formData, allergies_description: e.target.value })
+                    }
+                    placeholder="e.g. Rash after amoxicillin in 2019"
+                    className={INPUT_CLASS}
+                  />
+                </Field>
+              </FormSection>
 
-              <div className="flex justify-end gap-3 pt-2">
+              <div className="flex flex-col-reverse gap-3 border-t border-gray-100 pt-4 sm:flex-row sm:justify-end">
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="rounded-lg border-gray-300 px-4 py-2 text-gray-700 hover:bg-gray-50"
+                  className="rounded-lg border border-gray-300 px-4 py-2 text-gray-700 transition hover:bg-gray-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
+                  className="flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-5 py-2 font-medium text-white transition hover:bg-blue-700 disabled:opacity-50"
                 >
                   {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-                  {editingId ? 'Update' : 'Add'} patient
+                  {editingId ? 'Save changes' : 'Add patient'}
                 </button>
               </div>
             </form>

@@ -554,21 +554,10 @@ BATCH4_MEDICINES = [
     # =================================================================== #
     # OPHTHALMIC - a large share of retail volume.
     # =================================================================== #
-    _med(
-        "Moxifloxacin 0.5% Eye Drops", "Moxifloxacin", "Ophthalmic antibiotic",
-        "Fourth-generation fluoroquinolone",
-        "Bacterial conjunctivitis, keratitis, corneal ulcer, perioperative prophylaxis",
-        strength="0.5%", form="drops", route="Ophthalmic", brand="Vigamox",
-        formula="C21H24FN3O4", weight="401.43 g/mol",
-        moa="Inhibits DNA gyrase and topoisomerase IV, blocking bacterial DNA replication. The methoxy group at C-8 reduces efflux-pump resistance compared with earlier quinolones.",
-        side_effects="Transient burning, blurred vision, eye irritation, taste disturbance through the nasolacrimal duct.",
-        contra="Hypersensitivity to quinolones.",
-        warnings="Do not share a bottle between patients. Discard four weeks after opening - an expired eye drop is a contamination risk. Contact lenses must be removed and left out for the duration of treatment.",
-        interactions="Minimal with topical use",
-        max_dose="1 drop three times daily, or as directed",
-        schedule="Schedule H - prescription required",
-        cost=42.0, price=95.0,
-        storage="15-25C; discard 28 days after opening"),
+    # NOTE: "Moxifloxacin 0.5% Eye Drops" is NOT defined here either - batch 3
+    # holds it. See the Clotrimazole note above: the duplicate was silently
+    # dropped by the seeder, so it inflated the expected count rather than the
+    # catalogue. Its dosage guidance is in the guides list below.
     _med(
         "Carboxymethylcellulose 0.5% Eye Drops", "Carboxymethylcellulose",
         "Ophthalmic lubricant",
@@ -588,20 +577,13 @@ BATCH4_MEDICINES = [
     # =================================================================== #
     # DERMATOLOGY.
     # =================================================================== #
-    _med(
-        "Clotrimazole 1% Cream", "Clotrimazole", "Topical antifungal - imidazole",
-        "Ergosterol synthesis inhibitor (14-alpha demethylase)",
-        "Tinea corporis, cruris and pedis, candidiasis, pityriasis versicolor",
-        strength="1%", form="cream", route="Topical", brand="Candid",
-        formula="C22H17ClN2", weight="344.84 g/mol",
-        moa="Inhibits lanosterol 14-alpha-demethylase, blocking conversion of lanosterol to ergosterol. The resulting membrane defect is fungistatic and, at higher concentrations, fungicidal.",
-        side_effects="Local burning, irritation, erythema, peeling.",
-        contra="Hypersensitivity; avoid contact with the eye.",
-        warnings="A full course is needed - two to four weeks for tinea, continued one to two weeks past clinical resolution. That final step is the one patients skip, and it is why they relapse. If the rash has clearly not responded, reconsider the diagnosis rather than adding a steroid.",
-        interactions="Minimal with topical use",
-        max_dose="Apply twice daily to the affected area",
-        schedule="Not scheduled - OTC (no prescription required)",
-        rx=False, cost=38.0, price=85.0),
+    # NOTE: "Clotrimazole 1% Cream" is NOT defined here. Batch 3 already carries
+    # it with the full manufacturer, licence and pharmacopoeia detail. The
+    # seeder keys on the medicine NAME and silently skips a repeat, so a second
+    # definition here did not overwrite anything - it just meant the published
+    # catalogue count was two higher than the database could ever hold, and
+    # nothing reported the discrepancy. Dosage guidance for it lives in the
+    # batch-4 guides list below, which is the part that was genuinely missing.
     _med(
         "Betamethasone 0.1% + Clotrimazole 1% Cream",
         "Betamethasone + Clotrimazole",

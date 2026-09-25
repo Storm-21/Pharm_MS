@@ -24,12 +24,27 @@ from app.data.seed_medicines import DOSAGE_GUIDES as _BASE_GUIDES
 from app.data.seed_medicines_extra import EXTRA_MEDICINES, EXTRA_DOSAGE_GUIDES
 from app.data.seed_medicines_batch3 import BATCH3_MEDICINES, BATCH3_GUIDES
 from app.data.seed_medicines_batch4 import BATCH4_MEDICINES, BATCH4_GUIDES
+from app.data.seed_medicines_batch5 import BATCH5_MEDICINES, BATCH5_GUIDES
+# Batch 6 adds dosage GUIDANCE ONLY, for entries that had a medicine record but
+# no dose to open. It deliberately defines no medicines, so the catalogue count
+# is unchanged - see the module docstring.
+from app.data.seed_medicines_batch6 import BATCH6_GUIDES
+from app.data.seed_medicines_batch7 import (BATCH7_MEDICINES, BATCH7_GUIDES)
 from app.security import apply_seal
 # Batch order is deliberate: later batches extend earlier ones, and the
 # duplicate-name guard in ensure_seeded() rejects an accidental re-add rather
 # than silently shipping two rows for one medicine.
-MEDICINES = _BASE_MEDICINES + EXTRA_MEDICINES + BATCH3_MEDICINES + BATCH4_MEDICINES
-DOSAGE_GUIDES = _BASE_GUIDES + EXTRA_DOSAGE_GUIDES + BATCH3_GUIDES + BATCH4_GUIDES
+#
+# CAVEAT on that guard, learned the hard way: it *skips* the duplicate silently,
+# so a medicine repeated in a later batch is not added and not reported - the
+# catalogue ends up one shorter than the data files imply. test_catalogue.py
+# asserts the loaded count against the sum of the batches precisely so that
+# cannot go unnoticed again.
+MEDICINES = (_BASE_MEDICINES + EXTRA_MEDICINES + BATCH3_MEDICINES
+             + BATCH4_MEDICINES + BATCH5_MEDICINES + BATCH7_MEDICINES)
+DOSAGE_GUIDES = (_BASE_GUIDES + EXTRA_DOSAGE_GUIDES + BATCH3_GUIDES
+                 + BATCH4_GUIDES + BATCH5_GUIDES + BATCH6_GUIDES
+                 + BATCH7_GUIDES)
 
 # Opening stock per medicine: (quantity, reorder_level, max_stock, storage_location)
 # Chosen so that most lines are healthy and a handful trip the reorder alert.
@@ -180,6 +195,96 @@ OPENING_STOCK = {
     "Levetiracetam 500mg": (96, 30, 220, "Shelf J1 - Neurology"),
     "Escitalopram 10mg": (108, 30, 250, "Shelf J1 - Neurology"),
     "Fexofenadine 120mg": (165, 50, 350, "Shelf A4 - Antihistamines"),
+
+    # --- Batch 5: cardiac, newer antidiabetics, psychiatry, combination
+    # inhalers, paediatric liquids and the accompanying drugs. Varied on
+    # purpose, and the cold-chain and inhaler lines are set low so the
+    # reorder alerting has realistic cases rather than decorative ones.
+    "Isosorbide Dinitrate 10mg": (240, 60, 600, "Shelf D2 - Cardiovascular"),
+    "Nicorandil 5mg": (85, 25, 220, "Shelf D2 - Cardiovascular"),
+    "Ivabradine 5mg": (48, 20, 140, "Shelf D2 - Cardiovascular"),
+    "Nitroglycerin 0.5mg Sublingual": (110, 30, 250, "Shelf D2 - Cardiovascular"),
+
+    "Dapagliflozin 10mg": (175, 45, 450, "Shelf D1 - Diabetes"),
+    "Empagliflozin 10mg": (150, 40, 400, "Shelf D1 - Diabetes"),
+    "Sitagliptin 50mg": (130, 35, 350, "Shelf D1 - Diabetes"),
+    "Liraglutide 6mg/ml Injection": (14, 6, 30, "Cold Chain - Refrigerator 2-8C"),
+    "Dulaglutide 1.5mg Injection": (11, 5, 25, "Cold Chain - Refrigerator 2-8C"),
+
+    "Venlafaxine 75mg": (115, 30, 300, "Shelf J1 - Neurology"),
+    "Mirtazapine 15mg": (92, 25, 240, "Shelf J1 - Neurology"),
+    # Batch 3 defines this as "Alprazolam 0.5mg", and batch 5 deliberately does
+    # not repeat it. A stock line for "Alprazolam 0.25mg" therefore named a
+    # medicine that does not exist in the catalogue and was silently dropped on
+    # seed - so the controlled-drug shelf showed one fewer line than the opening
+    # stock block implies, and this out-of-stock demo case was never created.
+    "Alprazolam 0.5mg": (0, 40, 300, "Shelf J2 - Controlled Drugs"),          # out of stock
+    "Clonazepam 0.5mg": (68, 25, 200, "Shelf J2 - Controlled Drugs"),
+
+    # --- Batch 7 additions --------------------------------------------------
+    # Opening stock for the classes batch 7 introduced. As with the rest of this
+    # block these are a starting point for a stock take, not a purchasing
+    # recommendation, and a few deliberate zeros keep the low-stock and
+    # out-of-stock alerting visibly working.
+    "Cefuroxime Axetil 500mg": (96, 30, 220, "Shelf A2 - Antibiotics"),
+    "Cefixime Dry Syrup 100mg/5ml": (74, 24, 160, "Shelf A2 - Antibiotics"),
+    "Cefadroxil 500mg": (88, 30, 200, "Shelf A2 - Antibiotics"),
+    "Clarithromycin 250mg": (62, 20, 150, "Shelf A2 - Antibiotics"),
+    "Erythromycin 250mg": (58, 20, 140, "Shelf A2 - Antibiotics"),
+    "Tetracycline 500mg": (44, 20, 120, "Shelf A3 - Antibiotics"),
+    "Cotrimoxazole 960mg": (132, 40, 300, "Shelf A3 - Antibiotics"),
+    "Clindamycin 300mg": (0, 20, 120, "Shelf A3 - Antibiotics"),           # out of stock
+    "Terbinafine 250mg": (48, 15, 110, "Shelf B2 - Antifungals"),
+    "Itraconazole 100mg": (26, 12, 80, "Shelf B2 - Antifungals"),          # low
+    "Griseofulvin 250mg": (54, 18, 120, "Shelf B2 - Antifungals"),
+
+    "Tamsulosin 0.4mg": (78, 25, 190, "Shelf H1 - Urology"),
+    "Finasteride 5mg": (64, 20, 160, "Shelf H1 - Urology"),
+    "Oxybutynin 5mg": (72, 25, 170, "Shelf H1 - Urology"),
+    "Tadalafil 10mg": (48, 15, 120, "Shelf H1 - Urology"),
+
+    "Carbimazole 10mg": (56, 20, 140, "Shelf F2 - Endocrine"),
+    "Levothyroxine 25mcg": (0, 30, 200, "Shelf F2 - Endocrine"),           # out of stock
+
+    "Ondansetron Mouth Dissolving 4mg": (84, 25, 200, "Shelf C2 - Gastro"),
+    "Doxylamine + Pyridoxine": (62, 20, 150, "Shelf M1 - Obstetric"),
+    "Ursodeoxycholic Acid 300mg": (34, 15, 100, "Shelf C2 - Gastro"),
+
+    "Methotrexate 2.5mg": (28, 12, 90, "Shelf I1 - Rheumatology"),
+    "Hydroxychloroquine 200mg": (52, 20, 130, "Shelf I1 - Rheumatology"),
+    "Dexamethasone 0.5mg": (118, 35, 260, "Shelf I2 - Corticosteroids"),
+    "Clobetasol Propionate 0.05% Cream": (58, 18, 140, "Shelf B3 - Dermatology"),
+    "Amitriptyline 10mg": (92, 30, 210, "Shelf J1 - Neurology"),
+    "Flunarizine 10mg": (44, 18, 120, "Shelf J1 - Neurology"),
+    "Propranolol 20mg": (86, 30, 200, "Shelf D2 - Cardiovascular"),
+    "Betahistine 8mg": (68, 22, 160, "Shelf J3 - Vestibular"),
+    "Ivermectin 12mg": (36, 15, 110, "Shelf G2 - Antiparasitics"),
+    "Calcium Carbonate + Cholecalciferol": (216, 60, 480, "Shelf F3 - Supplements"),
+    "Rifampicin + Isoniazid + Pyrazinamide + Ethambutol": (0, 20, 120,
+                                                          "Shelf K1 - Antitubercular"),  # out of stock
+
+    "Budesonide + Formoterol 200/6mcg Inhaler": (58, 20, 150, "Shelf E2 - Respiratory"),
+    "Tiotropium 18mcg Inhaler": (32, 12, 90, "Shelf E2 - Respiratory"),
+    "Fluticasone + Salmeterol 125/25mcg Inhaler": (26, 10, 80, "Shelf E2 - Respiratory"),
+    "Ipratropium + Levosalbutamol Respirator Solution": (74, 25, 180,
+                                                         "Shelf E2 - Respiratory"),
+
+    "Paracetamol 125mg/5ml Suspension": (190, 50, 450, "Shelf F2 - Paediatric"),
+    "Amoxicillin 125mg/5ml Dry Syrup": (135, 40, 350, "Shelf B2 - Antibiotics"),
+    "Cetirizine 5mg/5ml Syrup": (170, 45, 400, "Shelf E1 - Antihistamines"),
+    "Ibuprofen 100mg/5ml Suspension": (155, 45, 380, "Shelf F2 - Paediatric"),
+    "Metronidazole 100mg/5ml Suspension": (105, 30, 260, "Shelf B2 - Antibiotics"),
+    "Zinc Sulphate 20mg Dispersible Tablet": (330, 90, 700, "Shelf F1 - Rehydration"),
+
+    "Domperidone 10mg": (210, 55, 500, "Shelf C1 - Gastro"),
+    "Rabeprazole 20mg": (250, 60, 600, "Shelf C1 - Gastro"),
+    # Batch 3 defines this as "Lactulose Solution" with the strength (10g/15ml)
+    # carried in the strength field, not appended to the name. The name here
+    # included the strength, which no medicine is ever called, so this line was
+    # dropped on seed for the same reason as the Alprazolam line above.
+    "Lactulose Solution": (96, 30, 220, "Shelf C1 - Gastro"),
+    "Rivaroxaban 20mg": (62, 20, 160, "Shelf D2 - Cardiovascular"),
+    "Folic Acid 5mg": (520, 120, 1100, "Shelf G1 - Vitamins"),
 }
 
 

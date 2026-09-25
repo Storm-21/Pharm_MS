@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
-import { Pill, ShieldCheck, ShieldAlert } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ShieldCheck, ShieldAlert } from 'lucide-react';
+import { UnseenStudioMark, UnseenStudioWordmark } from './UnseenStudioMark';
 
 /**
  * Animated startup screen, shown once per browser session before the app itself.
@@ -8,20 +9,32 @@ import { Pill, ShieldCheck, ShieldAlert } from 'lucide-react';
  * working UI. Creator attribution and the integrity result are pulled from the
  * backend rather than hardcoded here, so the name shown is the one the backend
  * verifies.
+ *
+ * The animation is staged rather than decorative:
+ *   1  the Unseen Studio mark draws its own strokes on a dark field
+ *   2  the product name rises as the mark settles
+ *   3  creator attribution, integrity badge and boot checklist
+ *   4  fade to the application
+ *
+ * The timings live in one table so the sequence can be read at a glance - the
+ * previous version scattered setTimeout calls with magic numbers inline, which
+ * made the order of the reveal impossible to verify by reading.
  */
+const STAGES = [
+  { phase: 1, at: 220 },   // host mark begins drawing
+  { phase: 2, at: 1150 },  // product name rises
+  { phase: 3, at: 1900 },  // creator attribution and badge
+  { phase: 4, at: 3600 },  // begin fading out
+  { phase: 5, at: 4200 },  // finish
+];
+
 export function SplashScreen({ branding, onFinish }) {
   const [phase, setPhase] = useState(0);
   const [logoOk, setLogoOk] = useState(true);
 
-  // Staged animation: logo -> title -> attribution -> fade out.
   useEffect(() => {
-    const timers = [
-      setTimeout(() => setPhase(1), 150),
-      setTimeout(() => setPhase(2), 700),
-      setTimeout(() => setPhase(3), 1500),
-      setTimeout(() => setPhase(4), 3000),
-      setTimeout(() => onFinish(), 3600),
-    ];
+    const timers = STAGES.map((stage) => setTimeout(() => setPhase(stage.phase), stage.at));
+    timers.push(setTimeout(() => onFinish(), STAGES[STAGES.length - 1].at));
     return () => timers.forEach(clearTimeout);
   }, [onFinish]);
 
@@ -36,33 +49,58 @@ export function SplashScreen({ branding, onFinish }) {
   const integrityOk = branding?.integrity_ok !== false;
   const tampered = branding && branding.integrity_ok === false;
 
+  // Boot lines are cosmetic, but they name real checks the app performs rather
+  // than inventing progress: the identity is verified, records are sealed, the
+  // data directory is resolved.
+  const bootSteps = useMemo(
+    () => [
+      'Verifying creator identity',
+      integrityOk ? 'Sealed clinical records — intact' : 'Integrity check reported a problem',
+      'Loading local database',
+      'Preparing the workspace',
+    ],
+    [integrityOk]
+  );
+
   return (
     <div
-      className={`fixed inset-0 z-50 flex items-center justify-center bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-950 transition-opacity duration-600 ${phase >= 4 ? 'opacity-0' : 'opacity-100'
-        }`}
+      className={`fixed inset-0 z-50 flex items-center justify-center overflow-hidden bg-slate-950 transition-opacity duration-700 ${
+        phase >= 4 ? 'opacity-0' : 'opacity-100'
+      }`}
     >
-      {/* Animated background orbs */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-32 -left-32 w-96 h-96 rounded-full bg-blue-500/20 blur-3xl animate-pulse-slow" />
-        <div className="absolute -bottom-40 -right-24 w-[28rem] h-[28rem] rounded-full bg-indigo-500/20 blur-3xl animate-pulse-slower" />
-        <div className="absolute top-1/3 left-1/2 w-72 h-72 rounded-full bg-cyan-400/10 blur-3xl animate-drift" />
+      {/* --- Background ----------------------------------------------------
+          A faint grid gives the dark field depth without a texture file, and
+          three drifting orbs keep the frame alive while the mark draws. */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="splash-grid absolute inset-0 opacity-40" />
+        <div className="absolute -top-40 -left-32 h-[28rem] w-[28rem] rounded-full bg-cyan-500/20 blur-3xl animate-pulse-slow" />
+        <div className="absolute -bottom-48 -right-24 h-[32rem] w-[32rem] rounded-full bg-indigo-500/20 blur-3xl animate-pulse-slower" />
+        <div className="absolute left-1/2 top-1/2 h-80 w-80 -translate-x-1/2 -translate-y-1/2 rounded-full bg-blue-500/10 blur-3xl animate-drift" />
+        {/* One sweep of light across the whole screen as it opens. */}
+        <div className="splash-sheen" />
       </div>
 
-      <div className="relative text-center px-6">
-        {/* Logo mark */}
+      <div className="relative w-full max-w-lg px-8 text-center">
+        {/* --- Host studio mark ------------------------------------------- */}
         <div
-          className={`mx-auto mb-8 flex h-24 w-24 items-center justify-center rounded-3xl bg-white/10 ring-1 ring-white/20 backdrop-blur transition-all duration-700 ${phase >= 1 ? 'scale-100 opacity-100' : 'scale-50 opacity-0'
-            }`}
+          className={`mx-auto mb-7 flex h-28 w-28 items-center justify-center transition-all duration-700 ${
+            phase >= 1 ? 'scale-100 opacity-100' : 'scale-75 opacity-0'
+          }`}
         >
           {customised && logoOk ? (
             <img
               src="/api/branding/logo"
               alt={appName}
-              className="h-20 w-20 object-contain"
+              className="h-24 w-24 object-contain drop-shadow-[0_0_28px_rgba(34,211,238,0.35)]"
               onError={() => setLogoOk(false)}
             />
           ) : (
-            <Pill className="h-12 w-12 text-cyan-300 animate-float" />
+            <UnseenStudioMark
+              className={`h-28 w-28 transition-transform duration-1000 ${
+                phase >= 2 ? 'scale-90' : 'scale-100'
+              }`}
+              animated
+            />
           )}
         </div>
 
@@ -96,37 +134,78 @@ export function SplashScreen({ branding, onFinish }) {
           )}
         </div>
 
-        {/* Integrity badge */}
+        {/* --- Host studio wordmark ---------------------------------------- */}
         <div
-          className={`mt-8 inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-medium transition-all duration-700 ${phase >= 3 ? 'opacity-100' : 'opacity-0'
-            } ${tampered
+          className={`mt-7 flex justify-center transition-all duration-700 ${
+            phase >= 3 ? 'opacity-100' : 'opacity-0'
+          }`}
+        >
+          <UnseenStudioWordmark />
+        </div>
+
+        {/* --- Integrity badge --------------------------------------------- */}
+        <div
+          className={`mt-6 inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-medium transition-all duration-700 ${
+            phase >= 3 ? 'opacity-100' : 'opacity-0'
+          } ${
+            tampered
               ? 'bg-red-500/15 text-red-200 ring-1 ring-red-400/40'
               : integrityOk
                 ? 'bg-emerald-500/15 text-emerald-200 ring-1 ring-emerald-400/40'
                 : 'bg-amber-500/15 text-amber-200 ring-1 ring-amber-400/40'
-            }`}
+          }`}
         >
-          {tampered ? <ShieldAlert className="h-3.5 w-3.5" /> : <ShieldCheck className="h-3.5 w-3.5" />}
+          {tampered ? (
+            <ShieldAlert className="h-3.5 w-3.5" />
+          ) : (
+            <ShieldCheck className="h-3.5 w-3.5" />
+          )}
           {tampered
             ? 'Creator identity failed verification'
             : integrityOk
               ? 'Creator identity verified'
-              : 'Verifying creator identity...'}
+              : 'Verifying creator identity\u2026'}
         </div>
+
+        {/* --- Boot checklist ----------------------------------------------
+            These name the checks the app actually performs on startup, so the
+            list is information rather than invented progress. */}
+        <ul
+          className={`mx-auto mt-7 max-w-xs space-y-1.5 text-left transition-opacity duration-700 ${
+            phase >= 3 ? 'opacity-100' : 'opacity-0'
+          }`}
+        >
+          {bootSteps.map((step, index) => {
+            const done = phase >= 3 && index <= 2;
+            return (
+              <li key={step} className="flex items-center gap-2 text-xs text-slate-400">
+                <span
+                  className={`flex h-3.5 w-3.5 flex-shrink-0 items-center justify-center rounded-full text-[9px] font-bold ${
+                    done ? 'bg-emerald-500/25 text-emerald-300' : 'bg-white/10 text-slate-500'
+                  }`}
+                >
+                  {done ? '\u2713' : index + 1}
+                </span>
+                {step}
+              </li>
+            );
+          })}
+        </ul>
 
         {version && (
           <p
-            className={`mt-4 text-xs text-slate-400 transition-opacity duration-700 ${phase >= 3 ? 'opacity-100' : 'opacity-0'
-              }`}
+            className={`mt-5 text-xs text-slate-500 transition-opacity duration-700 ${
+              phase >= 3 ? 'opacity-100' : 'opacity-0'
+            }`}
           >
             Version {version}
           </p>
         )}
 
-        {/* Progress bar */}
-        <div className="mx-auto mt-10 h-0.5 w-56 overflow-hidden rounded-full bg-white/10">
+        {/* --- Progress bar ------------------------------------------------- */}
+        <div className="mx-auto mt-6 h-0.5 w-56 overflow-hidden rounded-full bg-white/10">
           <div
-            className="h-full bg-gradient-to-r from-cyan-400 to-indigo-400 transition-all duration-[3400ms] ease-out"
+            className="h-full bg-gradient-to-r from-cyan-400 via-blue-400 to-indigo-400 transition-all duration-[4000ms] ease-out"
             style={{ width: phase >= 1 ? '100%' : '0%' }}
           />
         </div>

@@ -11,10 +11,20 @@ executable.
 ## Quick start
 ### Install the desktop app (recommended)
 
+**For anyone downloading it:** grab `PharmMS-Setup.exe` from the
+[latest release](https://github.com/Storm-21/Pharm_MS/releases/latest) and run
+it. It is about 65 KB: it downloads the application from the release, verifies
+the download against a SHA-256 hash compiled into the setup file, and installs
+it. No Python, no Node.js, no administrator rights. An internet connection is
+needed for the download step only; the installed application is fully offline.
+
+**To build it yourself:**
+
 ```powershell
 cd backend
-.\build_exe.ps1          # produce dist\PharmMS.exe
-.\install_app.ps1        # install + create shortcuts
+.\build_bootstrapper.ps1     # produce dist\PharmMS-Setup.exe + dist\PharmMS.exe
+.\verify_bootstrapper.ps1    # assert the two agree before you ship them
+.\install_app.ps1            # install locally + create shortcuts
 ```
 
 This installs to `%LOCALAPPDATA%\Programs\PharmMS` — **no administrator rights
@@ -24,6 +34,31 @@ needed** — and creates a shortcut on your Desktop and in the Start Menu.
 .\install_app.ps1 -Uninstall              # remove app + shortcuts, keep data
 .\install_app.ps1 -Uninstall -KeepData    # same, and skip the data prompt
 ```
+
+### The installer is a bootstrapper, and why
+
+| | Embedded-payload installer | Web bootstrapper |
+|---|---|---|
+| Download size | ~15 MB | **~65 KB** |
+| Needs internet | No | Yes, for the download step |
+| Payload can be re-pulled | No | Yes |
+| Tampered download | Not detected | **Refused** (SHA-256 gate) |
+
+A local installer carries no application code at all — only the URL of the
+payload and the hash it must match. That is what makes the download small, and
+it means a corrupted or substituted payload fails the integrity check and is
+refused rather than installed.
+
+The trade-off is stated plainly: **it requires an internet connection.** The
+older embedded-payload installer did not. `build_installer.ps1` is kept for
+anyone who needs the offline variant; both scripts write
+`dist\PharmMS-Setup.exe`, so run one or the other, not both.
+
+**Both files must go to the same release.** The bootstrapper without the payload
+is an installer that downloads nothing and fails. `verify_bootstrapper.ps1`
+asserts that the hash baked into the bootstrapper matches the payload actually
+built, because building them out of order produces exactly that broken release —
+a mistake made while developing this, caught by that script.
 
 ### Running it
 Double-click **PharmMS** on your Desktop. It opens in its **own application
@@ -317,10 +352,35 @@ PharmacyMS/
 | GET | `/api/inventory/alerts` | Low-stock, out-of-stock and expiry alerts |
 | POST | `/api/recommender/safety-screen` | Combined allergy/contraindication/interaction/stock verdict |
 | POST | `/api/recommender/dosage` | Weight-based / age-appropriate dose calculation |
-| POST | `/api/recommender/weight-dose` | Full weight-based working: formula, steps, caps |
+| POST | `/api/recommender/weight-dose` | Full weight-based working: formula, steps, caps. Pass `method` to choose a formula. |
+| POST | `/api/recommender/dose-formulas` | **Every** published formula in one call, each flagged usable/not with a reason. `combine` adds the agreement between them. |
 | POST | `/api/recommender/recommend-medicines` | Screened recommendations |
 | GET | `/api/security/branding` | Creator attribution + identity status |
 | GET | `/api/security/verify` | Full integrity report for all records |
+
+### Choosing the dosage formula
+
+The calculator does not decide for you. `/dose-formulas` computes all four
+published methods — mg/kg, BSA (Mosteller), Clark's rule and Young's rule — and
+returns each with `usable` and, when it cannot be applied, a plain-language
+`reason`. A formula whose inputs are missing is returned **disabled with the
+reason**, never omitted, so the UI can explain why an option is unavailable
+rather than leaving the user to guess.
+
+With `combine: true` it also returns the agreement between them. That block
+reports the **spread, and never an average** — averaging clinical doses has no
+published basis and would invent a figure no method supports:
+
+| Agreement | Meaning |
+|---|---|
+| `close` | Every applicable formula is within 5% |
+| `moderate` | Up to 20% apart — prefer the weight-based figure |
+| `wide` | Materially apart — use judgement |
+| `single` | Only one formula could be applied, so there is **nothing to compare** |
+
+The `single` case matters: with no weight on file the only usable method is
+Young's rule, and reporting that as "close agreement" would present an age
+estimate as corroborated when nothing corroborated it.
 
 ---
 
@@ -382,10 +442,10 @@ each activation against a server you control. That is a contained change to
 ## Expanding the catalogue
 India markets a very large number of formulations (six figures of brand variants
 across roughly two thousand active ingredients) and there is no single
-authoritative machine-readable file. The 40 medicines shipped here are a
-curated, verified *dispensing* set. To load national coverage, use the importer
-with a real source — CDSCO approved-drug lists, the Jan Aushadhi catalogue, NPPA
-ceiling-price lists, or your own distributor sheet:
+authoritative machine-readable file. The 172 medicines shipped here are a
+curated, verified *dispensing* set assembled in seven batches. To load national
+coverage, use the importer with a real source — CDSCO approved-drug lists, the
+Jan Aushadhi catalogue, NPPA ceiling-price lists, or your own distributor sheet:
 
 ```powershell
 cd backend
@@ -400,6 +460,29 @@ half-empty record must never enter a clinical database looking complete.
 Imported rows are sealed like any other, so `init_db.py --verify` reports them
 as INTACT.
 
+### Why the shipped set is not "every medicine in India"
+
+Because reaching that number honestly is not something a generated file can do,
+and the failure mode is worse than the gap. To list a thousand ingredients means
+writing the molecular formula, half-life, pregnancy category, dose ceiling and
+contraindications for hundreds of molecules from nothing. An invented
+contraindication is indistinguishable on screen from a real one, and this is the
+one error that could actually reach a patient: a pharmacist who finds a drug
+absent will look it up, whereas one who reads a confident wrong figure will
+believe it.
+
+So the curated set grows by *verified class* rather than by padding, and the
+importer is the supported route to national coverage. The batches each record
+why they exist:
+
+| Batch | Adds |
+|---|---|
+| 1–2 | Core Indian community-practice dispensing set |
+| 3–4 | Ophthalmic, vaccines, dermatology, high-volume retail |
+| 5 | Calcium channel blockers, newer antidiabetics, antidepressants, combination inhalers, paediatric liquids |
+| 6 | Dosage guidance **only**, for entries that had none — a drug you can look up but cannot dose is only half-present |
+| 7 | Cephalosporins, macrolides, antifungals, urologicals, antithyroid, migraine prophylaxis, topical steroids, first-line antitubercular combination, antiparasitics |
+
 I deliberately did not generate entries to pad the count. Inventing dosages,
 formulas and risk data for a medicine would be fabricating clinical information,
 which is the one thing this project will not do.
@@ -410,16 +493,32 @@ which is the one thing this project will not do.
 
 ```powershell
 cd backend
-.\venv\Scripts\python.exe test_weight_dosing.py   # dosing formulas (17 tests)
+.\venv\Scripts\python.exe test_catalogue.py       # catalogue integrity (18 checks)
+.\venv\Scripts\python.exe test_weight_dosing.py   # dosing formulas (30 tests)
 .\venv\Scripts\python.exe test_safety.py          # safety engine (26 tests)
 .\venv\Scripts\python.exe test_migration.py       # schema migration
 .\venv\Scripts\python.exe test_endpoints.py       # every API route (58 checks)
+.\verify_bootstrapper.ps1                          # installer + payload agree
 ```
 
 `test_endpoints.py` drives every registered endpoint against a throwaway
 database, so it catches the class of defect that is invisible from the UI — a
 route that 500s, or one that answers `success: false` and is ignored by its
 caller. It exits non-zero on any failure.
+
+`test_catalogue.py` guards the catalogue against the defects it has actually
+suffered: a duplicate medicine name (the seeder silently skips it, so the
+published count was wrong for a whole release), a duplicate
+`(medicine, age_group)` guide (the second was dropped and its text lost), an
+orphan guide, an unrecognised age band, a missing required column, and a whole
+**missing table** (see below). It also asserts that a table dropped from the
+database is genuinely recreated by the migration — because
+`db.create_all()` is not enough on an existing database, as the same file
+documents.
+
+`verify_bootstrapper.ps1` is the release gate for the installer: it proves the
+payload matches the hash compiled into the bootstrapper, and that a one-byte
+modification of the payload changes that hash.
 
 ---
 
