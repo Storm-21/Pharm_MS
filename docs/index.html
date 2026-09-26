@@ -453,6 +453,35 @@
       Download PharmMS-Setup.exe
     </a>
 
+    <!-- Linux -------------------------------------------------------------- -->
+    <div class="os-split" style="margin-top:1.6rem">
+      <h3>Also on Linux</h3>
+      <p style="max-width:44rem">
+        PharmMS ships for Linux as an <strong>AppImage</strong> - one file, no
+        installation, run it directly - and as a <strong>.deb</strong> package
+        for Debian and Ubuntu-based systems.
+      </p>
+      <ul class="steps" style="margin-top:.4rem">
+        <li><strong>AppImage</strong> - download, make it executable
+          (<code>chmod +x PharmMS-x86_64.AppImage</code>), and run it. Requires
+          FUSE (<code>libfuse2</code> on Ubuntu 22.04+); if FUSE is missing,
+          run it with <code>--appimage-extract-and-run</code>.</li>
+        <li><strong>.deb</strong> - <code>sudo apt install ./pharms_*.deb</code>.
+          Adds a menu entry and needs <code>libwebkit2gtk-4.1-0</code>, which
+          apt resolves automatically.</li>
+      </ul>
+      <div style="display:flex;gap:.8rem;flex-wrap:wrap;margin-top:1rem">
+        <a class="btn btn-outline"
+           href="https://github.com/Storm-21/Pharm_MS/releases/latest/download/PharmMS-x86_64.AppImage">
+          Download AppImage
+        </a>
+        <a class="btn btn-outline"
+           href="https://github.com/Storm-21/Pharm_MS/releases/latest/download/pharms_amd64.deb">
+          Download .deb
+        </a>
+      </div>
+    </div>
+
     <p class="micro">
       <a href="https://github.com/Storm-21/Pharm_MS/releases/latest" target="_blank" rel="noopener">All releases and version history</a>
     </p>
