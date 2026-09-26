@@ -693,13 +693,66 @@
 </main>
 
 <!-- ================================================================ -->
+<!-- ================================================================ -->
+<!-- DigitalPlat free domain deployment                               -->
+<!-- ================================================================ -->
+<section id="digitalplat" class="section section-dark reveal">
+  <div class="wrap narrow">
+    <h2>Hosting it yourself on a free DigitalPlat domain</h2>
+    <p class="section-lede">
+      This site is a static HTML page, so it can be hosted anywhere and given
+      a real domain name for free through <a
+      href="https://domain.digitalplat.org/" target="_blank"
+      rel="noopener">DigitalPlat's USG</a> programme, which issues
+      genuine top-level domains such as <code>.dpdns.org</code> at no cost.
+    </p>
+
+    <div class="dpd-step">
+      <h3>1. Get a free domain</h3>
+      <p>
+        Register at <a href="https://domain.digitalplat.org/"
+        target="_blank" rel="noopener">domain.digitalplat.org</a>. Choose
+        a name, confirm the email, and the domain is provisioned in
+        minutes. No payment and no card details are involved.
+      </p>
+    </div>
+
+    <div class="dpd-step">
+      <h3>2. Host the static page</h3>
+      <p>
+        Push the <code>docs/</code> folder to a GitHub repository and enable
+        GitHub Pages from <em>Settings &rarr; Pages</em>, or serve it on
+        Cloudflare Pages / Netlify. The page has no build step - what is in
+        the folder is what is served.
+      </p>
+    </div>
+
+    <div class="dpd-step">
+      <h3>3. Point the domain at the host</h3>
+      <p>
+        In the DigitalPlat dashboard open DNS management and add the record
+        the host asks for - a <code>CNAME</code> to
+        <code>&lt;user&gt;.github.io</code> for GitHub Pages, or the host's
+        own target for Cloudflare Pages / Netlify. Then set the custom
+        domain on the hosting side and let the TLS certificate issue.
+      </p>
+    </div>
+
+    <p class="micro">
+      The domain registration and DNS change are account actions only the
+      domain owner can perform; this documentation describes the steps
+      rather than performing them.
+    </p>
+  </div>
+</section>
+
 <!-- Footer                                                          -->
 <!-- ================================================================ -->
 <footer class="site-footer">
  <div class="wrap footer-inner">
     <div>
       <p class="footer-brand">PharmMS</p>
-      <p class="micro">Offline pharmacy management for Windows.</p>
+      <p class="micro">Offline pharmacy management for Windows and Linux.</p>
     </div>
     <nav class="footer-nav">
       <a href="#source">Source code access</a>
