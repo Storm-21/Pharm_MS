@@ -25,12 +25,19 @@ jobs:
 
       - name: Build frontend and freeze backend
         run: powershell -ExecutionPolicy Bypass -File backend/build_exe.ps1
-
+      # The asset is uploaded as PharmMS-Setup.exe, NOT PharmMS.exe, because
+      # that is the exact filename the landing site's download button links to
+      # via releases/latest/download/. GitHub's /latest/download/ URL resolves
+      # by filename, so any mismatch here is a 404 on the site's one
+      # call-to-action - which is precisely the failure an earlier run shipped.
+      - name: Rename the installer for publication
+        shell: pwsh
+        run: Copy-Item backend/dist/PharmMS.exe backend/dist/PharmMS-Setup.exe
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
         with:
           name: PharmMS-windows-exe
-          path: backend/dist/PharmMS.exe
+          path: backend/dist/PharmMS-Setup.exe
           if-no-files-found: error
 
   # --- Linux build DISABLED -------------------------------------------------
@@ -88,7 +95,9 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           # Windows only for now - the Linux artifacts are attached again
-          # automatically if the build-linux job above is re-enabled.
+          # automatically if the build-linux job above is re-enabled. The name
+          # must stay PharmMS-Setup.exe: docs/index.html links to it through
+          # releases/latest/download/, which resolves by exact filename.
           files: |
-            dist/PharmMS.exe
+            dist/PharmMS-Setup.exe
           generate_release_notes: true

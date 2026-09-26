@@ -455,31 +455,22 @@
 
     <!-- Linux -------------------------------------------------------------- -->
     <div class="os-split" style="margin-top:1.6rem">
-      <h3>Also on Linux</h3>
+      <h3>Linux</h3>
+      <!-- WHY THIS IS A NOTE AND NOT A DOWNLOAD BUTTON.
+           The Linux release jobs (AppImage and .deb) are currently DISABLED
+           in .github/workflows/release.yml - they failed on the CI runner,
+           while the Windows build passed locally and on CI. Publishing Linux
+           download links that point at artifacts no release contains would
+           404 every Linux visitor, which is worse than telling them the
+           truth: not yet available. The build scripts remain in the repo
+           (build_linux.sh, package_linux.sh) and the links are restored the
+           moment a release actually ships the packages. -->
       <p style="max-width:44rem">
-        PharmMS ships for Linux as an <strong>AppImage</strong> - one file, no
-        installation, run it directly - and as a <strong>.deb</strong> package
-        for Debian and Ubuntu-based systems.
+        A Linux build is <strong>in testing</strong>. Packages for Linux
+        (AppImage and .deb) are not yet published - this note replaces the
+        download links so you are not sent to a file that does not exist.
+        Windows is the supported platform today.
       </p>
-      <ul class="steps" style="margin-top:.4rem">
-        <li><strong>AppImage</strong> - download, make it executable
-          (<code>chmod +x PharmMS-x86_64.AppImage</code>), and run it. Requires
-          FUSE (<code>libfuse2</code> on Ubuntu 22.04+); if FUSE is missing,
-          run it with <code>--appimage-extract-and-run</code>.</li>
-        <li><strong>.deb</strong> - <code>sudo apt install ./pharms_*.deb</code>.
-          Adds a menu entry and needs <code>libwebkit2gtk-4.1-0</code>, which
-          apt resolves automatically.</li>
-      </ul>
-      <div style="display:flex;gap:.8rem;flex-wrap:wrap;margin-top:1rem">
-        <a class="btn btn-outline"
-           href="https://github.com/Storm-21/Pharm_MS/releases/latest/download/PharmMS-x86_64.AppImage">
-          Download AppImage
-        </a>
-        <a class="btn btn-outline"
-           href="https://github.com/Storm-21/Pharm_MS/releases/latest/download/pharms_amd64.deb">
-          Download .deb
-        </a>
-      </div>
     </div>
 
     <p class="micro">
@@ -752,7 +743,7 @@
  <div class="wrap footer-inner">
     <div>
       <p class="footer-brand">PharmMS</p>
-      <p class="micro">Offline pharmacy management for Windows and Linux.</p>
+      <p class="micro">Offline pharmacy management for Windows. Linux build in testing.</p>
     </div>
     <nav class="footer-nav">
       <a href="#source">Source code access</a>
