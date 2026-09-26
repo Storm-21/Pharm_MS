@@ -50,6 +50,9 @@ ADDED_COLUMNS = [
 
     # Medicine: provenance for anything pulled from the live source, so a
     # fetched record is distinguishable from the authored reference set.
+    # (Superseded by the block at the end of this list, which also declares
+    # clinical_status. Kept here because ADDED_COLUMNS is applied in order and
+    # an installation may already have these two; the probe skips what exists.)
     ('medicines', 'data_source', 'VARCHAR(120)'),
     ('medicines', 'data_fetched_at', 'DATETIME'),
 
@@ -67,6 +70,18 @@ ADDED_COLUMNS = [
     # M/A/N dosing dots and the receipt uses as the billed line.
     ('prescription_items', 'dose_schedule', 'VARCHAR(40)'),
     ('prescription_items', 'dispensed_units', 'INTEGER'),
+
+    # Medicines: provenance and completeness.
+    #
+    # data_source and data_fetched_at were in this list from the start but were
+    # never declared on the Medicine MODEL, so SQLAlchemy discarded them on
+    # write and every imported row was indistinguishable from a curated one.
+    # The model now declares all three. clinical_status records 'partial' when
+    # the source supplied the product's identity but none of its clinical
+    # fields, so the gap is queryable rather than buried in free text.
+    ('medicines', 'data_source', 'VARCHAR(120)'),
+    ('medicines', 'data_fetched_at', 'DATETIME'),
+    ('medicines', 'clinical_status', 'VARCHAR(40)'),
 ]
 
 
@@ -107,6 +122,57 @@ ADDED_TABLES = [
 ]
 
 
+# ---------------------------------------------------------------------------
+# CONSTRAINTS THAT MUST BE RELAXED ON AN EXISTING DATABASE.
+# ---------------------------------------------------------------------------
+# medicines.name carried UNIQUE from the first release. That is wrong for a
+# retail pharmacy: two manufacturers legitimately make "Paracetamol 500mg", the
+# pharmacy stocks whichever it holds, and the second one must be storable. A
+# pharmacy importing its own supplier list otherwise loses every line whose name
+# it already stocks, silently.
+#
+# WHY THIS IS THE MOST DANGEROUS MIGRATION IN THIS FILE
+# SQLite cannot drop a constraint. The only way is to rebuild the table: create
+# a replacement, copy every row, drop the original, and rename. A pharmacy's
+# live database may hold thousands of medicines and inventory rows pointing at
+# them, so a failure part-way through would lose the drug catalogue.
+#
+# So the rebuild is written to be recoverable rather than merely correct:
+#   * the whole operation runs inside ONE transaction, so a failure rolls back
+#     and leaves the original table exactly as it was;
+#   * foreign keys are disabled for the duration, because dropping the original
+#     table would otherwise cascade into inventory and prescription items;
+#   * the row count is compared before and after, and a mismatch aborts;
+#   * the result is verified by asking the schema whether the old single-column
+#     UNIQUE is gone and the composite one is present;
+#   * it is idempotent - a database that has already been rebuilt reports
+#     nothing to do and is not touched again.
+#
+# Each entry is (table, marker, rebuild_sql, verify_sql). 'marker' is a string
+# that must appear in the CREATE TABLE statement when the migration is ALREADY
+# done, so the check is a read of the real schema rather than a version guess.
+REBUILT_TABLES = [
+    (
+        'medicines',
+        # Present in the rebuilt schema, absent in the original.
+        'CONSTRAINT uq_medicine_name_manufacturer',
+        # The rebuild DDL is GENERATED from the model at run time rather than
+        # written out by hand.
+        #
+        # A hand-written column list was the first attempt and it was wrong: it
+        # drifted from the model, leaving out `brand_name` and `expiry_date` and
+        # inventing `data_source`, so every query after the rebuild failed with
+        # "no such column". A 50-column list duplicated by hand will always
+        # eventually disagree with the model it is meant to mirror.
+        #
+        # Generating it from Medicine.__table__ means the replacement is by
+        # construction in step with the model, and the only thing this file
+        # states is the CONSTRAINT, which is the deliberate change.
+        '__FROM_MODEL__',
+    ),
+]
+
+
 def _existing_columns(connection, table):
     """Column names present in a table, via PRAGMA. Empty set if absent."""
     try:
@@ -138,6 +204,172 @@ def _table_exists(connection, table):
         ), {'n': table}
     ).fetchone()
     return row is not None
+
+
+def _rebuild_ddl_from_model(table):
+    """
+    Build CREATE TABLE for the replacement, straight from the SQLAlchemy model.
+
+    Deriving the statement rather than hand-writing it is what keeps the rebuilt
+    table in step with the model. The first attempt wrote the ~50 columns out by
+    hand and promptly disagreed with `Medicine` - leaving out `brand_name` and
+    `expiry_date` and inventing `data_source` - so every query after the rebuild
+    failed with "no such column".
+
+    SQLAlchemy's own DDL compiler is used, so types, nullability, defaults and
+    the model's __table_args__ (including the composite unique constraint this
+    migration exists to introduce) all come across faithfully.
+    """
+    from sqlalchemy.schema import CreateTable
+    from app import db
+    from app import models  # noqa: F401 - ensures every model is registered
+
+    model_table = db.metadata.tables.get(table)
+    if model_table is None:
+        raise RuntimeError('no model registered for table %s' % table)
+
+    statement = str(CreateTable(model_table)
+                    .compile(dialect=db.engine.dialect))
+    # Point it at the staging name; the final rename puts it back.
+    return statement.replace('CREATE TABLE %s' % table,
+                             'CREATE TABLE %s_rebuilt' % table, 1)
+
+
+def _rebuild_table(connection, table, marker, logger=None):
+    """
+    Rebuild a table to change a constraint, without losing a single row.
+
+    SQLite has no ALTER TABLE ... DROP CONSTRAINT, so the only route is: make a
+    replacement, copy every row, drop the original, rename. That is four
+    statements on live data, and the danger is a failure between them - a
+    crash, a full disk, a constraint violation on copy - which would leave the
+    pharmacy with no medicines table at all.
+
+    The protections here are deliberate:
+
+    1. **One transaction.** Everything runs inside BEGIN/COMMIT, so any failure
+       rolls back to the original table complete with its rows. The connection
+       is switched out of autocommit for this step only.
+    2. **Foreign keys off.** Dropping the original table would otherwise fire
+       ON DELETE rules and remove the inventory and prescription rows that
+       point at it. Foreign keys are disabled for the duration and re-enabled
+       after, which is what SQLite's own documented procedure prescribes.
+    3. **Row count checked.** The rows before and after must agree. A silent
+       partial copy is the failure that would otherwise go unnoticed.
+    4. **Result verified against the schema.** The marker is re-read from
+       sqlite_master afterwards, so success is proven rather than assumed.
+    5. **Indexes recreated.** They belonged to the dropped table.
+
+    The columns to copy are intersected at run time between the old table and
+    the new one, so this works whether the source database is from the first
+    release or the most recent one - a database that predates several columns
+    simply copies the ones it has.
+    """
+    previous_isolation = connection.isolation_level
+    had_foreign_keys = connection.execute('PRAGMA foreign_keys').fetchone()[0]
+
+    before = connection.execute('SELECT COUNT(*) FROM %s' % table).fetchone()[0]
+    old_columns = {row[1] for row in
+                   connection.execute('PRAGMA table_info(%s)' % table).fetchall()}
+
+    # The replacement is created first, outside the transaction, so its name is
+    # free. IF NOT EXISTS guards a previous failed attempt having left one.
+    connection.execute('DROP TABLE IF EXISTS %s_rebuilt' % table)
+    connection.execute(_rebuild_ddl_from_model(table))
+    new_columns = {row[1] for row in connection.execute(
+        'PRAGMA table_info(%s_rebuilt)' % table).fetchall()}
+    shared = [c for c in new_columns if c in old_columns]
+    if not shared:
+        raise RuntimeError('no columns in common between %s and its replacement'
+                           % table)
+
+    try:
+        connection.isolation_level = ''      # defer writes; explicit BEGIN below
+        connection.execute('PRAGMA foreign_keys = OFF')
+        connection.execute('BEGIN')
+
+        column_list = ', '.join(shared)
+        connection.execute(
+            'INSERT INTO %s_rebuilt (%s) SELECT %s FROM %s'
+            % (table, column_list, column_list, table))
+
+        copied = connection.execute(
+            'SELECT COUNT(*) FROM %s_rebuilt' % table).fetchone()[0]
+        if copied != before:
+            raise RuntimeError(
+                'row count mismatch rebuilding %s: %d before, %d copied'
+                % (table, before, copied))
+
+        connection.execute('DROP TABLE %s' % table)
+        connection.execute('ALTER TABLE %s_rebuilt RENAME TO %s' % (table, table))
+
+        # Recreate the indexes the dropped table owned. They are declared on the
+        # model, so they are read from there for the same reason the columns are.
+        from app import db as _db
+        model_table = _db.metadata.tables.get(table)
+        if model_table is not None:
+            for index in model_table.indexes:
+                columns = ', '.join(c.name for c in index.columns)
+                connection.execute(
+                    'CREATE INDEX IF NOT EXISTS %s ON %s (%s)'
+                    % (index.name, table, columns))
+
+        connection.execute('COMMIT')
+    except Exception:
+        connection.execute('ROLLBACK')
+        # Leave no half-built table behind either.
+        connection.execute('DROP TABLE IF EXISTS %s_rebuilt' % table)
+        raise
+    finally:
+        connection.isolation_level = previous_isolation
+        try:
+            connection.execute('PRAGMA foreign_keys = %d' % had_foreign_keys)
+        except Exception:
+            pass
+
+    # Prove it, rather than trust the statements above.
+    row = connection.execute(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name=?",
+        (table,)).fetchone()
+    if not row or marker not in (row[0] or ''):
+        raise RuntimeError('rebuilt table %s does not carry the new constraint'
+                           % table)
+
+    after = connection.execute('SELECT COUNT(*) FROM %s' % table).fetchone()[0]
+    if after != before:
+        raise RuntimeError('row count changed rebuilding %s: %d then %d'
+                           % (table, before, after))
+
+    if logger:
+        logger.info('Rebuilt %s: %d rows preserved, constraint relaxed',
+                    table, after)
+
+
+def _needs_table_rebuild(database_path):
+    """
+    Names of tables whose constraints still need rebuilding.
+
+    Read from the REAL schema: sqlite_master holds the literal CREATE TABLE
+    statement, so looking for the composite constraint by name is a direct
+    question about what the file contains rather than a guess from a version
+    number. A table that does not exist at all is not "needing a rebuild" -
+    create_all() makes it in its current shape.
+    """
+    import sqlite3
+    probe = sqlite3.connect(database_path, timeout=15)
+    try:
+        pending = []
+        for table, marker, _steps in REBUILT_TABLES:
+            row = probe.execute(
+                "SELECT sql FROM sqlite_master WHERE type='table' AND name=?",
+                (table,)).fetchone()
+            if row is None:
+                continue                      # absent: create_all() handles it
+            if marker not in (row[0] or ''):
+                pending.append(table)
+        return pending
+    finally:
+        probe.close()
 
 
 def _all_columns_present(database_path):
@@ -172,6 +404,10 @@ def _all_columns_present(database_path):
         for table, _create_sql, _index_sql in ADDED_TABLES:
             if not table_exists(table):
                 return False
+        # A table whose constraints have not been rebuilt counts as not
+        # migrated, so the fast path cannot skip past a pending rebuild.
+        if _needs_table_rebuild(database_path):
+            return False
         return True
     finally:
         probe.close()
@@ -179,7 +415,7 @@ def _all_columns_present(database_path):
 
 def apply_migrations(db, logger=None):
     """
-    Add any missing columns. Safe to call on every startup.
+    Add any missing columns, and rebuild tables whose constraints changed.
 
     Returns a list of 'table.column' strings that were added.
     """
@@ -284,6 +520,30 @@ def apply_migrations(db, logger=None):
             except Exception as exc:
                 if logger:
                     logger.warning('Could not create table %s: %s', table, exc)
+
+        # --- Tables whose constraints must be relaxed -----------------------
+        # See REBUILT_TABLES above for why this is the riskiest step in the
+        # file. It runs LAST, so any column or table this migration adds has
+        # already landed and the rebuilt table can copy it.
+        for table, marker, _steps in REBUILT_TABLES:
+            if not table_present(table):
+                continue
+            row = connection.execute(
+                "SELECT sql FROM sqlite_master WHERE type='table' AND name=?",
+                (table,)).fetchone()
+            if row and marker in (row[0] or ''):
+                continue                      # already rebuilt
+
+            try:
+                _rebuild_table(connection, table, marker, logger)
+                added.append('%s (constraint rebuilt)' % table)
+            except Exception as exc:
+                # A rebuild that fails must leave the ORIGINAL table in place.
+                # _rebuild_table wraps its work in a transaction for exactly
+                # that reason; this catch is the second line of defence, so one
+                # unexpected schema difference cannot brick an install.
+                if logger:
+                    logger.warning('Could not rebuild table %s: %s', table, exc)
     finally:
         connection.close()
 

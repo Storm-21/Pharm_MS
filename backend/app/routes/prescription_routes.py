@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 from app import db
 from app.models import Prescription, PrescriptionItem, Medicine, Patient
+from app.models.prescription import parse_dose_schedule
 from datetime import datetime
 
 prescription_bp = Blueprint('prescriptions', __name__, url_prefix='/api/prescriptions')
@@ -62,6 +63,20 @@ def create_prescription():
         for item_data in data.get('items', []):
             medicine = Medicine.query.get_or_404(item_data['medicine_id'])
             
+            # The dosing pattern is validated before it is stored. A pattern
+            # that is not three hyphen-separated slots is refused rather than
+            # saved, because a malformed pattern printed on a sheet is a
+            # mis-read dose - and it would be the patient who acts on it.
+            schedule = item_data.get('dose_schedule')
+            if schedule and not parse_dose_schedule(schedule):
+                return jsonify({
+                    'success': False,
+                    'error': ('Dose schedule "%s" is not a valid pattern. Use '
+                              'three hyphen-separated values in the order '
+                              'morning-midday-night, for example 0-0-1 or '
+                              '1-1/2-0.' % schedule),
+                }), 400
+
             item = PrescriptionItem(
                 prescription_id=prescription.id,
                 medicine_id=item_data['medicine_id'],
@@ -70,18 +85,20 @@ def create_prescription():
                 frequency=item_data['frequency'],
                 duration_days=item_data['duration_days'],
                 special_instructions=item_data.get('special_instructions'),
+                dose_schedule=schedule,
+                dispensed_units=item_data.get('dispensed_units'),
             )
-            
+
             db.session.add(item)
-        
+
         db.session.commit()
-        
+
         return jsonify({
             'success': True,
             'message': 'Prescription created successfully',
             'data': prescription.to_dict()
         }), 201
-    
+
     except Exception as e:
         db.session.rollback()
         return jsonify({
@@ -95,22 +112,22 @@ def update_prescription(prescription_id):
     try:
         prescription = Prescription.query.get_or_404(prescription_id)
         data = request.get_json()
-        
+
         prescription.doctor_name = data.get('doctor_name', prescription.doctor_name)
         prescription.diagnosis = data.get('diagnosis', prescription.diagnosis)
         prescription.notes = data.get('notes', prescription.notes)
-        
+
         if data.get('valid_until'):
             prescription.valid_until = datetime.strptime(data['valid_until'], '%Y-%m-%d')
-        
+
         db.session.commit()
-        
+
         return jsonify({
             'success': True,
             'message': 'Prescription updated successfully',
             'data': prescription.to_dict()
         })
-    
+
     except Exception as e:
         db.session.rollback()
         return jsonify({
@@ -125,12 +142,12 @@ def delete_prescription(prescription_id):
         prescription = Prescription.query.get_or_404(prescription_id)
         db.session.delete(prescription)
         db.session.commit()
-        
+
         return jsonify({
             'success': True,
             'message': 'Prescription deleted successfully'
         })
-    
+
     except Exception as e:
         db.session.rollback()
         return jsonify({
@@ -144,7 +161,7 @@ def add_prescription_item(prescription_id):
     try:
         prescription = Prescription.query.get_or_404(prescription_id)
         data = request.get_json()
-        
+
         item = PrescriptionItem(
             prescription_id=prescription_id,
             medicine_id=data['medicine_id'],
@@ -153,6 +170,8 @@ def add_prescription_item(prescription_id):
             frequency=data['frequency'],
             duration_days=data['duration_days'],
             special_instructions=data.get('special_instructions'),
+            dose_schedule=data.get('dose_schedule'),
+            dispensed_units=data.get('dispensed_units'),
         )
         
         db.session.add(item)

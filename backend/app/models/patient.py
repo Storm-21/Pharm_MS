@@ -1,22 +1,30 @@
 from app import db
+from app.crypto import EncryptedString, EncryptedText
 from datetime import datetime
 
 class Patient(db.Model):
     __tablename__ = 'patients'
-    
+
     id = db.Column(db.Integer, primary_key=True)
+    # first_name and last_name deliberately stay plaintext: the app searches
+    # patients BY NAME with SQL LIKE, and a printed prescription needs to find
+    # a patient by name without decrypting every row. Names are also what the
+    # unique email constraint and every report join on. The sensitive contact
+    # and medical fields below ARE encrypted - see app/crypto.py.
     first_name = db.Column(db.String(100), nullable=False)
     last_name = db.Column(db.String(100), nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=True)
-    phone = db.Column(db.String(20), nullable=True)
+    # Encrypted at rest. Note: SQL LIKE search no longer matches these fields,
+    # because the database sees ciphertext; that is the point.
+    phone = db.Column(EncryptedString(40), nullable=True)
     date_of_birth = db.Column(db.Date, nullable=False)
     gender = db.Column(db.String(10), nullable=False)  # Male, Female, Other
-    
-    # Medical conditions
-    chronic_diseases = db.Column(db.Text, nullable=True)  # Comma-separated: Diabetes, Hypertension, etc.
-    current_medications = db.Column(db.Text, nullable=True)
-    allergies_description = db.Column(db.Text, nullable=True)
-    
+
+    # Medical conditions - encrypted, these are the most sensitive fields here
+    chronic_diseases = db.Column(EncryptedText, nullable=True)  # Comma-separated: Diabetes, Hypertension, etc.
+    current_medications = db.Column(EncryptedText, nullable=True)
+    allergies_description = db.Column(EncryptedText, nullable=True)
+
     # --- Clinical measurements needed for safe dosing -----------------------
     # Weight is the basis of every paediatric mg/kg calculation, so a dose
     # cannot be called "weight-based" without it. Stored in kilograms; the
@@ -40,9 +48,9 @@ class Patient(db.Model):
     pregnancy_trimester = db.Column(db.Integer, nullable=True)  # 1, 2 or 3
     is_breastfeeding = db.Column(db.Boolean, default=False, nullable=True)
 
-    # Contact info
-    address = db.Column(db.Text, nullable=True)
-    city = db.Column(db.String(100), nullable=True)
+    # Contact info - encrypted
+    address = db.Column(EncryptedText, nullable=True)
+    city = db.Column(EncryptedString(150), nullable=True)
     country = db.Column(db.String(100), nullable=True)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)

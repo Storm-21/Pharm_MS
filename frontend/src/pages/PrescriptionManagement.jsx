@@ -10,6 +10,10 @@ import {
   X,
 } from 'lucide-react';
 import { apiClient } from '../api';
+import {
+  describeDosePattern,
+  doseScheduleValid,
+} from '../doseSchedule';
 
 /**
  * Prescription management.
@@ -42,6 +46,7 @@ export function PrescriptionManagement() {
     dosage_amount: '',
     dosage_unit: 'mg',
     frequency: 'Twice daily',
+    dose_schedule: '',
     duration_days: '5',
     special_instructions: '',
   });
@@ -157,6 +162,7 @@ export function PrescriptionManagement() {
         ...draft,
         medicine_id: Number(draft.medicine_id),
         dosage_amount: Number(draft.dosage_amount),
+        dose_schedule: draft.dose_schedule.trim() || undefined,
         duration_days: Number(draft.duration_days),
         medicine_name: medicine ? medicine.name : 'Unknown',
       },
@@ -166,6 +172,7 @@ export function PrescriptionManagement() {
       dosage_amount: '',
       dosage_unit: 'mg',
       frequency: 'Twice daily',
+      dose_schedule: '',
       duration_days: '5',
       special_instructions: '',
     });
@@ -438,6 +445,35 @@ export function PrescriptionManagement() {
                     />
                   </div>
                   <div>
+                    <label className="mb-1 block text-xs font-medium text-gray-600">
+                      Dose pattern (morning-midday-night)
+                    </label>
+                    {/* The 0-0-1 notation an Indian prescriber writes on a pad.
+                        Validated live, because a malformed pattern refused only
+                        at submit time is found too late to be learned from. */}
+                    <input
+                      value={draft.dose_schedule || ''}
+                      onChange={(e) => setDraft({ ...draft, dose_schedule: e.target.value })}
+                      placeholder="0-0-1"
+                      className={`w-full rounded border px-3 py-2 text-sm font-mono tracking-wider ${
+                        draft.dose_schedule && !doseScheduleValid(draft.dose_schedule)
+                          ? 'border-red-400 bg-red-50'
+                          : 'border-gray-300'
+                      }`}
+                    />
+                    <p className={`mt-1 text-xs ${
+                      draft.dose_schedule && doseScheduleValid(draft.dose_schedule)
+                        ? 'text-green-600'
+                        : 'text-gray-400'
+                    }`}>
+                      {draft.dose_schedule
+                        ? (doseScheduleValid(draft.dose_schedule)
+                          ? describeDosePattern(draft.dose_schedule)
+                          : 'Use three hyphen-separated values, e.g. 0-0-1 or 1-1/2-0')
+                        : 'Optional — e.g. 0-0-1 = one at night, 1-1/2-0 = one and a half in the morning'}
+                    </p>
+                  </div>
+                  <div>
                     <label className="mb-1 block text-xs font-medium text-gray-600">Days</label>
                     <input
                       type="number"
@@ -530,6 +566,13 @@ export function PrescriptionManagement() {
                             {item.dosage_amount} {item.dosage_unit}
                           </td>
                           <td className="px-3 py-2 text-gray-600">{item.frequency}</td>
+                          <td className="px-3 py-2 text-gray-600">
+                            {item.dose_schedule ? (
+                              <span className="font-mono tracking-wider text-gray-900">{item.dose_schedule}</span>
+                            ) : (
+                              <span className="text-gray-300">—</span>
+                            )}
+                          </td>
                           <td className="px-3 py-2 text-center text-gray-600">
                             {item.duration_days}
                           </td>
@@ -630,6 +673,7 @@ export function PrescriptionManagement() {
                       <th className="px-3 py-2 text-left font-semibold text-gray-700">Medicine</th>
                       <th className="px-3 py-2 text-left font-semibold text-gray-700">Dose</th>
                       <th className="px-3 py-2 text-left font-semibold text-gray-700">Frequency</th>
+                      <th className="px-3 py-2 text-left font-semibold text-gray-700">Pattern</th>
                       <th className="px-3 py-2 text-center font-semibold text-gray-700">Days</th>
                     </tr>
                   </thead>

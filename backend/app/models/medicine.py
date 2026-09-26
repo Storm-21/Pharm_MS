@@ -4,8 +4,26 @@ from datetime import datetime
 class Medicine(db.Model):
     __tablename__ = 'medicines'
     
+    # A medicine is identified by its NAME AND ITS MANUFACTURER together.
+    #
+    # 'name' alone was UNIQUE, which is wrong for a retail pharmacy: two
+    # manufacturers legitimately make "Paracetamol 500mg" at different prices
+    # and the pharmacy stocks whichever it holds. With the single-column
+    # constraint the second product simply could not be stored, so a pharmacy
+    # importing its own supplier list lost every line whose name it already
+    # stocked - silently, because the importer skipped it.
+    #
+    # The composite constraint keeps the property that actually matters: a
+    # repeat of the same product from the same manufacturer is refused, so
+    # re-importing a sheet cannot duplicate the shelf. Existing databases are
+    # migrated to this shape by app/migrations.py, which rebuilds the table.
+    __table_args__ = (
+        db.UniqueConstraint('name', 'manufacturer',
+                            name='uq_medicine_name_manufacturer'),
+    )
+
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(150), nullable=False, unique=True)
+    name = db.Column(db.String(150), nullable=False, index=True)
     generic_name = db.Column(db.String(150), nullable=False)
     brand_name = db.Column(db.String(150), nullable=True)
 
@@ -91,6 +109,27 @@ class Medicine(db.Model):
     record_hash = db.Column(db.String(128), nullable=True)
     content_seal = db.Column(db.String(128), nullable=True)
 
+    # --- Provenance for imported records -----------------------------------
+    # WHERE THIS ROW CAME FROM, and a marker for whether its clinical fields
+    # are complete.
+    #
+    # These two columns were listed in migrations.ADDED_COLUMNS from the start,
+    # but were never declared on this model - so SQLAlchemy silently discarded
+    # them and every imported medicine looked exactly like a curated one. 324
+    # rows brought in from the Jan Aushadhi product list were indistinguishable
+    # from the verified dispensing set, which is the one distinction that had to
+    # survive: an imported row carries a name, composition and strength, but the
+    # source states no indications, side effects or contraindications.
+    #
+    #        data_source       'Jan Aushadhi (PMBJP)', a distributor sheet, or
+    #                          NULL for the curated catalogue
+    #        clinical_status   'partial' when the source supplied no clinical
+    #                          fields, so the gap is queryable rather than only
+    #                          being visible in the free-text warnings
+    data_source = db.Column(db.String(120), nullable=True)
+    data_fetched_at = db.Column(db.DateTime, nullable=True)
+    clinical_status = db.Column(db.String(40), nullable=True)
+
     # Relationships
     inventory = db.relationship('Inventory', backref='medicine', lazy=True, cascade='all, delete-orphan')
     prescription_items = db.relationship('PrescriptionItem', backref='medicine', lazy=True)
@@ -147,6 +186,17 @@ class Medicine(db.Model):
             'has_image': bool(self.image_filename),
             'image_source': self.image_source,
             'image_attribution': self.image_attribution,
+
+            # --- Provenance and completeness --------------------------------
+            # Sent on every record so the UI can distinguish the curated,
+            # verified dispensing set from an imported catalogue row - which
+            # carries a name, composition and strength and NO clinical detail.
+            # The distinction has to travel with the data, because a screen
+            # that cannot see it will present the two identically.
+            'data_source': self.data_source,
+            'clinical_status': self.clinical_status or 'complete',
+            'is_curated': not self.data_source,
+            'partial_clinical_data': self.clinical_status == 'partial',
         }
         if include_seal:
             data['record_hash'] = self.record_hash

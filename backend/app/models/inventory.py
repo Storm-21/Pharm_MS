@@ -29,6 +29,10 @@ class Inventory(db.Model):
             'id': self.id,
             'medicine_id': self.medicine_id,
             'medicine_name': self.medicine.name if self.medicine else None,
+            # The maker shown under the medicine name in the inventory table, so
+            # the same drug from two manufacturers reads as two distinct lines
+            # rather than looking like a duplicate entry.
+            'manufacturer': self.medicine.manufacturer if self.medicine else None,
             'quantity_in_stock': self.quantity_in_stock,
             'reorder_level': self.reorder_level,
             'max_stock': self.max_stock,

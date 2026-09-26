@@ -17,6 +17,7 @@ from flask import Blueprint, jsonify, Response, request
 
 from app import licensing
 from app.models import Patient, Prescription, Medicine, PrescriptionItem
+from app.models.prescription import describe_dose_schedule
 
 report_bp = Blueprint('reports', __name__, url_prefix='/api/reports')
 
@@ -616,6 +617,23 @@ def _inscription_rows(prescription):
             sig_html += f' &mdash; <span class="lat">{freq_bit}</span>'
         if item.special_instructions:
             sig_html += ' &mdash; ' + _e(item.special_instructions).rstrip('.')
+
+        # The dosing pattern is printed as its own emphasised line.
+        #
+        # '0-0-1' is the notation an Indian prescriber writes on the pad and the
+        # pharmacist reads at a glance - it says WHICH doses of the day, which
+        # the frequency text does not. "Twice daily" cannot distinguish
+        # morning-and-night from midday-and-night, and for a drug taken at a
+        # particular time that difference is the whole instruction. It is shown
+        # in the stronger weight so it is not lost beside the Sig. text.
+        schedule = getattr(item, 'dose_schedule', None)
+        if schedule and describe_dose_schedule(schedule):
+            sig_html += (
+                f'<br><span class="doses" style="font-weight:600;'
+                f'letter-spacing:0.06em">{_e(schedule)}</span>'
+                f'<br><span style="color:#6b7280;font-size:10.5px">'
+                f'{_e(describe_dose_schedule(schedule))}</span>'
+            )
 
         # The generic name is what identifies the medicine clinically.
         generic = _e(medicine.generic_name) if medicine else ''

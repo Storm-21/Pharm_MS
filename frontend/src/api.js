@@ -60,7 +60,22 @@ const query = (params) => {
 
 export const apiClient = {
   // --- Medicines ----------------------------------------------------------
-  getMedicines: (search = '', page = 1, perPage = 100) =>
+  // WHY perPage IS 500 RATHER THAN 100
+  //
+  // Every screen that needs the medicine list calls getMedicines() with no
+  // arguments, so the default here IS the catalogue size the user sees. It was
+  // 100, and the catalogue has since grown past that - so the database held 172
+  // medicines while the Medicine Database, the dosage calculator's picker and
+  // the prescription writer could only ever offer the first 100. Nothing on
+  // screen said so; the list simply stopped, which reads as "this is everything"
+  // and had a user reasonably asking whether India only has 100 medicines.
+  //
+  // The server-side default is 20 (see medicine_), so the client must
+  // be explicit. 500 is a deliberate ceiling rather than "unlimited": it is
+  // comfortably above the curated set and the realistic size of an imported
+  // regional catalogue, while still bounding one response. A catalogue larger
+  // than this should page through the API instead of loading in one go.
+  getMedicines: (search = '', page = 1, perPage = 500) =>
     request(`/medicines${query({ search, page, per_page: perPage })}`),
   getMedicine: (id) => request(`/medicines/${id}`),
   createMedicine: (data) => request('/medicines', { method: 'POST', body: JSON.stringify(data) }),

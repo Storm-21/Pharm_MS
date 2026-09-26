@@ -44,6 +44,17 @@ def _resolve_data_dir():
     return os.path.abspath(os.path.dirname(__file__))
 
 
+def get_data_dir():
+    """The resolved data directory, cached - also used for the encryption key."""
+    global _data_dir
+    if _data_dir is None:
+        _data_dir = _resolve_data_dir()
+    return _data_dir
+
+
+_data_dir = None
+
+
 def _resolve_frontend_dir():
     """Locate the built React bundle (frontend/build), if present."""
     candidates = []
