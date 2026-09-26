@@ -113,9 +113,34 @@ function Invoke-Npm {
     Get-Content $npmLog -ErrorAction SilentlyContinue | Select-Object -Last 5
 }
 
+# --- 0. The virtual environment ----------------------------------------------
+#
+# The venv is NOT checked in, so a fresh checkout - which is every CI run - has
+# none. The earlier behaviour failed hard with "Python venv not found", which was
+# the actual cause of the release workflow failing while the same command passed
+# on a developer machine that already had one. Creating it here means the script
+# is self-sufficient: it needs only a system Python on PATH.
 if (-not (Test-Path $VenvPython)) {
-    Fail "Python venv not found at $VenvPython. Create it with: python -m venv venv"
+    Write-Step "Creating the virtual environment (was missing at $VenvPython)"
+    $py = Get-Command python -ErrorAction SilentlyContinue
+    if (-not $py) {
+        $candidate = Get-Command py -ErrorAction SilentlyContinue
+        if ($candidate) { $pyCmd = 'py'; $pyArgs = @('-3') } else {
+            Fail 'No system Python found on PATH. Install Python 3.11.'
+        }
+    } else { $pyCmd = 'python'; $pyArgs = @() }
+    $proc = Start-Process -FilePath $pyCmd -ArgumentList ($pyArgs + @('-m', 'venv', 'venv')) `
+        -WorkingDirectory $BackendDir -NoNewWindow -Wait -PassThru
+    if ($proc.ExitCode -ne 0) { Fail 'python -m venv venv failed.' }
+    Write-Host '    venv created.'
 }
+
+# Requirements are installed idempotently: pip is fast when everything is
+# already satisfied, so this runs on every build without costing a stale
+# dependency a failure.
+Write-Step 'Installing Python requirements'
+$code = Invoke-VenvPython -Arguments @('-m', 'pip', 'install', '-r', 'requirements.txt', '--quiet')
+if ($code -ne 0) { Fail 'pip install -r requirements.txt failed.' }
 
 # --- 1. Frontend -------------------------------------------------------------
 if (-not $SkipFrontend) {
