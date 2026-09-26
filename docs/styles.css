@@ -706,3 +706,75 @@ details p {
   justify-content: flex-start;
   margin: 22px 0 0;
 }
+
+/* ==================================================================
+   Scroll-reveal
+   ------------------------------------------------------------------
+   Sections and cards ease into place as they enter the viewport.
+
+   HOW IT WORKS WITHOUT A FRAMEWORK: elements start in a slightly
+   shifted, transparent state via `.reveal`. A tiny inline script
+   (index.html) marks them `.reveal-visible` with an IntersectionObserver
+   as they scroll into view, and CSS transitions do the rest.
+
+   Two deliberate limits:
+     * No JavaScript one-way door. Without JS nothing ever adds
+       `.reveal-visible`, so a no-JS visitor would see a blank page -
+       the one failure a landing page must not have. The `no-js` class
+       on <html> is removed by the script; the hiding rule only applies
+       when JS is present, so a reader without it sees the page
+       immediately, fully visible, with no animation.
+     * `prefers-reduced-motion` disables the movement entirely. A
+       vestibular disorder makes parallax and sudden movement genuinely
+       unpleasant, and an animation the user cannot switch off is worse
+       than none.
+   ================================================================== */
+
+html.js .reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+
+html.js .reveal-visible {
+  opacity: 1;
+  transform: none;
+}
+
+/* Cards reveal in sequence rather than all at once, which reads as a
+   wave across the grid instead of a single pop. The delay is on the
+   card itself so the observer does not have to time anything. */
+html.js .grid .reveal,
+html.js .formula-grid .reveal,
+html.js .shots .reveal {
+  transition-delay: calc(var(--reveal-index, 0) * 90ms);
+}
+
+/* Hover lift on interactive cards - cheap, silent, and does not move
+   layout so it cannot cause scroll jank. */
+.card, .formula-card {
+  transition: box-shadow 0.25s ease, transform 0.25s ease;
+}
+.card:hover, .formula-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 28px rgba(15, 23, 42, 0.10);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.js .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  html.js .grid .reveal,
+  html.js .formula-grid .reveal,
+  html.js .shots .reveal {
+    transition-delay: 0s;
+  }
+  .card, .formula-card,
+  .card:hover, .formula-card:hover {
+    transition: none;
+    transform: none;
+  }
+  html { scroll-behavior: auto; }
+}

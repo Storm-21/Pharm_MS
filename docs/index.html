@@ -1,5 +1,10 @@
 ﻿<!DOCTYPE html>
-<html lang="en">
+<!-- The `no-js` class is swapped for `js` by the reveal script below. All
+     animation CSS is scoped to `html.js`, so a visitor without JavaScript
+     sees the page immediately and fully visible - a landing page that hid
+     its own content behind a script would be the one thing this offline
+     product must not do. -->
+<html lang="en" class="no-js">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -14,6 +19,7 @@
 
 <link rel="icon" href="img/logo.png">
 <link rel="stylesheet" href="styles.css">
+<style>html.no-js .reveal { opacity: 1; transform: none; }</style>
 </head>
 <body>
 
@@ -83,7 +89,7 @@
 <!-- ================================================================ -->
 <!-- Trust bar                                                        -->
 <!-- ================================================================ -->
-<section class="strip">
+<section class="strip reveal">
  <div class="wrap strip-inner">
     <div><strong>496</strong><span>medicines in the catalogue</span></div>
     <div><strong>96</strong><span>therapeutic classes</span></div>
@@ -95,7 +101,7 @@
 <!-- ================================================================ -->
 <!-- Features                                                        -->
 <!-- ================================================================ -->
-<section id="features" class="section">
+<section id="features" class="section reveal">
  <div class="wrap">
     <h2>What it does</h2>
     <p class="section-lede">
@@ -207,7 +213,7 @@
 <!-- ================================================================ -->
 <!-- Safety - the differentiator                                     -->
 <!-- ================================================================ -->
-<section id="safety" class="section section-dark">
+<section id="safety" class="section section-dark reveal">
  <div class="wrap">
     <h2>It refuses to guess</h2>
     <p class="section-lede">
@@ -282,7 +288,7 @@
 <!-- ================================================================ -->
 <!-- Dosing methods                                                  -->
 <!-- ================================================================ -->
-<section id="dosage" class="section">
+<section id="dosage" class="section reveal">
  <div class="wrap">
     <h2>How a dose is worked out</h2>
     <p class="section-lede">
@@ -382,7 +388,7 @@
 <!-- ================================================================ -->
 <!-- Screenshots                                                     -->
 <!-- ================================================================ -->
-<section id="screens" class="section">
+<section id="screens" class="section reveal">
  <div class="wrap">
     <h2>Screenshots</h2>
     <p class="section-lede">
@@ -426,7 +432,7 @@
 <!-- ================================================================ -->
 <!-- Download                                                        -->
 <!-- ================================================================ -->
-<section id="download" class="section section-tint">
+<section id="download" class="section section-tint reveal">
  <div class="wrap download-inner">
     <h2>Download and install</h2>
     <ol class="steps">
@@ -493,7 +499,7 @@
 <!-- ================================================================ -->
 <!-- Source access                                                   -->
 <!-- ================================================================ -->
-<section id="source" class="section section-tint">
+<section id="source" class="section section-tint reveal">
  <div class="wrap narrow">
     <h2>Source code access</h2>
     <p class="section-lede">
@@ -560,7 +566,7 @@
 <!-- ================================================================ -->
 <!-- FAQ                                                             -->
 <!-- ================================================================ -->
-<section id="faq" class="section">
+<section id="faq" class="section reveal">
  <div class="wrap narrow">
     <h2>Questions</h2>
 
@@ -684,9 +690,50 @@
       medicine data should be checked against the current edition of the
       relevant pharmacopoeia and the manufacturer's labelling.
     </p>
-    <p class="micro credit">Designed &amp; developed by Jayant</p>
- </div>
-</footer>
+        <p class="micro credit">Designed &amp; developed by Jayant</p>
+     </div>
+    </footer>
 
-</body>
-</html>
+    <!-- ================================================================ -->
+    <!-- Scroll-reveal                                                    -->
+    <!-- ================================================================ -->
+    <!-- A deliberate enhancement, not a dependency. Sections are already
+         visible in the stylesheet; this script only adds a class that lets
+         the CSS animate them in. If this script never runs - an old browser,
+         a reader, a crawler - nothing is hidden and nothing is broken. -->
+    <script>
+    (function () {
+      // Swap the class as the very first thing, before first paint, so no
+      // element is ever shown twice - once unstyled, then hidden and re-revealed.
+      document.documentElement.classList.remove('no-js');
+      document.documentElement.classList.add('js');
+
+      // Honour the operating-system preference. A user who has asked their OS
+      // for reduced motion has already opted out; a scroll animation there is
+      // not decoration, it is ignoring an explicit instruction.
+      var reduce = window.matchMedia
+        && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+      var targets = document.querySelectorAll('.reveal');
+      if (!targets.length) return;
+
+      // No IntersectionObserver, or reduced motion requested: show everything
+      // at once. Both branches leave the page fully readable.
+      if (reduce || !('IntersectionObserver' in window)) {
+        targets.forEach(function (el) { el.classList.add('reveal-visible'); });
+        return;
+      }
+
+      var observer = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+          if (!entry.isIntersecting) return;
+          entry.target.classList.add('reveal-visible');
+          observer.unobserve(entry.target);   // animate once, then stop watching
+        });
+      }, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' });
+
+      targets.forEach(function (el) { observer.observe(el); });
+    })();
+    </script>
+    </body>
+    </html>
