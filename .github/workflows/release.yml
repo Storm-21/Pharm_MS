@@ -1,0 +1,88 @@
+name: Release PharmMS
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    name: Windows .exe
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Build frontend and freeze backend
+        run: powershell -ExecutionPolicy Bypass -File backend/build_exe.ps1
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PharmMS-windows-exe
+          path: backend/dist/PharmMS.exe
+          if-no-files-found: error
+
+  build-linux:
+    name: Linux AppImage + .deb
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            python3 python3-venv python3-pip \
+            nodejs npm \
+            libgirepository1.0-dev libcairo2-dev libpango1.0-dev \
+            libgdk-pixbuf2.0-dev libwebkit2gtk-4.1-dev \
+            appimagetool dpkg-dev
+
+      - name: Build frontend and freeze backend
+        run: bash backend/build_linux.sh
+
+      - name: Package into AppImage and .deb
+        run: bash backend/package_linux.sh
+
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: PharmMS-linux
+          path: |
+            backend/dist/PharmMS-x86_64.AppImage
+            backend/dist/pharms_*_amd64.deb
+          if-no-files-found: error
+
+  release:
+    name: Attach to GitHub release
+    needs: [build-windows, build-linux]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+          path: dist
+
+      - name: Attach artifacts to the release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/PharmMS.exe
+            dist/PharmMS-x86_64.AppImage
+            dist/pharms_*_amd64.deb
+          generate_release_notes: true

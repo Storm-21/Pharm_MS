@@ -1,0 +1,31 @@
+# Line-ending policy, checked in.
+#
+# WHY THIS FILE EXISTS
+# The Linux build (build_linux.sh, package_linux.sh) runs on the ubuntu
+# runner and fails instantly with `/bin/bash^M: bad interpreter` if git
+# checks the scripts out with CRLF endings - which is exactly what happens
+# by default on a Windows working copy, since core.autocrlf is usually
+# true. Declaring the endings here makes the checked-out bytes independent
+# of the machine that cloned, so a Linux build never fails because the
+# developer who last committed was on Windows.
+
+# Shell scripts: LF everywhere, including on a Windows checkout.
+*.sh text eol=lf
+*.py text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+
+# Windows batch/PowerShell scripts are read by tools that want CRLF.
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+
+# Binaries are never converted.
+*.exe binary
+*.AppImage binary
+*.deb binary
+*.ico binary
+*.png binary
+*.jpg binary
+*.db binary

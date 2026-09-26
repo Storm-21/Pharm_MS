@@ -139,7 +139,21 @@ def run_window(port):
 
     url = f'http://{HOST}:{port}'
 
-    for gui in ('edgechromium', 'mshtml'):
+    # WHICH RENDERER, PER PLATFORM.
+    #
+    # On Windows WebView2 is the right first choice and MSHTML the fallback.
+    # On Linux the equivalents are GTK (webkit2gtk) and, where Qt is what the
+    # desktop runs on, QT - neither of which can be named on a Windows build,
+    # and neither of which pywebview would find from a hardcoded Windows list.
+    # The platform check keeps one source file honest on both.
+    if sys.platform == 'win32':
+        guis = ('edgechromium', 'mshtml')
+    elif sys.platform == 'darwin':
+        guis = ('cocoa',)
+    else:
+        guis = ('gtk', 'qt')
+
+    for gui in guis:
         try:
             webview.create_window(
                 WINDOW_TITLE,

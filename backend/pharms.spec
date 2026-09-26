@@ -14,6 +14,7 @@ the executable at runtime so each installation keeps its own data, and so
 replacing the .exe never destroys the user's records.
 """
 
+import sys
 from pathlib import Path
 
 # Paths resolved relative to this spec file (backend/).
@@ -51,13 +52,24 @@ hiddenimports = [
     'app.services.storage_service',
     'app.branding',
     'app.security',
-    # Native window stack
+    # Native window stack. WHICH backends are listed depends on the platform the
+    # spec is being read on, because PyInstaller bundles what the TARGET machine
+    # needs and a Linux build must not try to bundle .NET bindings that do not
+    # exist there. Listing a module that cannot be imported makes the Analysis
+    # step fail, so hardcoding the Windows set was not an option for a build
+    # that has to run on both.
     'webview',
-    'webview.platforms.edgechromium',
-    'webview.platforms.winforms',
-    'clr_loader',
-    'pythonnet',
-]
+] + (
+    ['webview.platforms.edgechromium',
+     'webview.platforms.winforms',
+     'clr_loader',
+     'pythonnet',
+     ] if sys.platform == 'win32' else
+    ['webview.platforms.gtk',
+     'webview.platforms.cocoa',
+     'webview.platforms.qt',
+     ]
+)
 
 a = Analysis(
     ['desktop_app.py'],
@@ -101,3 +113,11 @@ exe = EXE(
     entitlements_file=None,
     icon=str(BACKEND_DIR / 'pharms.ico') if (BACKEND_DIR / 'pharms.ico').exists() else None,
 )
+
+# A single-file build on Linux as well, matching the Windows payload: one
+# executable, no installation directory to manage. Onedir would be smaller and
+# start faster, but a pharmacy copying one file onto a USB stick is the use
+# case this build exists for.
+# NOTE: on Linux, runtime_tmpdir=None with onefile unpacks to /tmp at every
+# start, so first launch is slower than subsequent ones - documented in
+# build_linux.sh rather than worked around here.
