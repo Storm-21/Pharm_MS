@@ -110,7 +110,12 @@ if command -v appimagetool >/dev/null 2>&1; then
   cp -f "$Stage/applications/pharms.desktop" "$AppDir/" \
     || fail 'Could not stage the desktop entry for the AppImage.'
   [ -n "$IconSource" ] && cp -f "$IconSource" "$AppDir/pharms.png"
-  cd "$DistDir" && appimagetool "PharmMS.AppDir" "PharmMS-x86_64.AppImage"
+  # APPIMAGE_TOOL_FLAGS lets a caller add flags needed for its environment.
+  # CI (release.yml) sets --appimage-extract-and-run because GitHub runners
+  # have no FUSE; a developer machine leaves it unset and the default applies.
+  # shellcheck disable=SC2086
+  cd "$DistDir" && appimagetool $APPIMAGE_TOOL_FLAGS \
+    "PharmMS.AppDir" "PharmMS-x86_64.AppImage"
   rm -rf "$AppDir"
   green "  AppImage: dist/PharmMS-x86_64.AppImage"
 elif [ "$AppimageOnly" -eq 1 ]; then
