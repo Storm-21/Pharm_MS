@@ -13,6 +13,7 @@ import { apiClient } from '../api';
 import {
   describeDosePattern,
   doseScheduleValid,
+  formatDoseSchedule,
 } from '../doseSchedule';
 
 /**
@@ -165,6 +166,7 @@ export function PrescriptionManagement() {
         dose_schedule: draft.dose_schedule.trim() || undefined,
         duration_days: Number(draft.duration_days),
         medicine_name: medicine ? medicine.name : 'Unknown',
+        medicine_form: medicine ? medicine.form : undefined,
       },
     ]);
     setDraft({
@@ -344,7 +346,7 @@ export function PrescriptionManagement() {
                   <select
                     value={header.patient_id}
                     onChange={(e) => setHeader({ ...header, patient_id: e.target.value })}
-                    className="w-full rounded-lg border-gray-300 px-3 py-2"
+                    className="w-full rounded-lg border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200"
                   >
                     <option value="">Select patient</option>
                     {patients.map((p) => (
@@ -360,7 +362,7 @@ export function PrescriptionManagement() {
                     value={header.doctor_name}
                     onChange={(e) => setHeader({ ...header, doctor_name: e.target.value })}
                     placeholder="Dr. A. Sharma"
-                    className="w-full rounded-lg border-gray-300 px-3 py-2"
+                    className="w-full rounded-lg border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200"
                   />
                 </div>
                 <div>
@@ -369,7 +371,7 @@ export function PrescriptionManagement() {
                     value={header.diagnosis}
                     onChange={(e) => setHeader({ ...header, diagnosis: e.target.value })}
                     placeholder="e.g. Acute bronchitis"
-                    className="w-full rounded-lg border-gray-300 px-3 py-2"
+                    className="w-full rounded-lg border-gray-300 px-3 py-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200"
                   />
                 </div>
               </div>
@@ -404,7 +406,7 @@ export function PrescriptionManagement() {
                     <select
                       value={draft.medicine_id}
                       onChange={(e) => setDraft({ ...draft, medicine_id: e.target.value })}
-                      className="w-full rounded border-gray-300 px-3 py-2 text-sm"
+                      className="w-full rounded border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200"
                     >
                       <option value="">Select medicine</option>
                       {medicines.map((m) => (
@@ -421,7 +423,7 @@ export function PrescriptionManagement() {
                       step="0.01"
                       value={draft.dosage_amount}
                       onChange={(e) => setDraft({ ...draft, dosage_amount: e.target.value })}
-                      className="w-full rounded border-gray-300 px-3 py-2 text-sm"
+                      className="w-full rounded border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200"
                     />
                   </div>
                   <div>
@@ -429,7 +431,7 @@ export function PrescriptionManagement() {
                     <select
                       value={draft.dosage_unit}
                       onChange={(e) => setDraft({ ...draft, dosage_unit: e.target.value })}
-                      className="w-full rounded border-gray-300 px-3 py-2 text-sm"
+                      className="w-full rounded border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200"
                     >
                       {['mg', 'ml', 'mcg', 'IU', 'tablet', 'capsule', 'puff'].map((u) => (
                         <option key={u}>{u}</option>
@@ -441,7 +443,7 @@ export function PrescriptionManagement() {
                     <input
                       value={draft.frequency}
                       onChange={(e) => setDraft({ ...draft, frequency: e.target.value })}
-                      className="w-full rounded border-gray-300 px-3 py-2 text-sm"
+                      className="w-full rounded border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200"
                     />
                   </div>
                   <div>
@@ -455,7 +457,7 @@ export function PrescriptionManagement() {
                       value={draft.dose_schedule || ''}
                       onChange={(e) => setDraft({ ...draft, dose_schedule: e.target.value })}
                       placeholder="0-0-1"
-                      className={`w-full rounded border px-3 py-2 text-sm font-mono tracking-wider ${
+                      className={`w-full rounded border px-3 py-2 text-sm font-mono tracking-wider focus:border-blue-500 focus:ring-2 focus:ring-blue-200 transition-all duration-200 ${
                         draft.dose_schedule && !doseScheduleValid(draft.dose_schedule)
                           ? 'border-red-400 bg-red-50'
                           : 'border-gray-300'
@@ -563,12 +565,18 @@ export function PrescriptionManagement() {
                         <tr key={`${item.medicine_id}-${index}`} className="border-t">
                           <td className="px-3 py-2 text-gray-900">{item.medicine_name}</td>
                           <td className="px-3 py-2 text-gray-600">
-                            {item.dosage_amount} {item.dosage_unit}
+                            {item.dosage_amount}
+                            <span className={item.medicine_form === 'syrup' ? 'font-bold text-blue-600' : ''}>
+                              {item.dosage_unit}
+                            </span>
+                            {item.dose_schedule ? (
+                              <span className="text-xs opacity-75 ml-1">({formatDoseSchedule(item.dose_schedule, true)})</span>
+                            ) : null}
                           </td>
                           <td className="px-3 py-2 text-gray-600">{item.frequency}</td>
                           <td className="px-3 py-2 text-gray-600">
                             {item.dose_schedule ? (
-                              <span className="font-mono tracking-wider text-gray-900">{item.dose_schedule}</span>
+                              <span className="font-mono tracking-wider text-gray-900">{formatDoseSchedule(item.dose_schedule, true)}</span>
                             ) : (
                               <span className="text-gray-300">—</span>
                             )}
@@ -682,9 +690,15 @@ export function PrescriptionManagement() {
                       <tr key={item.id} className="border-t">
                         <td className="px-3 py-2 text-gray-900">{item.medicine_name}</td>
                         <td className="px-3 py-2 text-gray-600">
-                          {item.dosage_amount} {item.dosage_unit}
+                          {item.dosage_amount}
+                          <span className={item.medicine_form === 'syrup' ? 'font-bold text-blue-600' : ''}>
+                            {item.dosage_unit}
+                          </span>
                         </td>
                         <td className="px-3 py-2 text-gray-600">{item.frequency}</td>
+                        <td className="px-3 py-2 text-center text-gray-600">
+                          {item.dose_schedule ? describeDosePattern(item.dose_schedule) : '—'}
+                        </td>
                         <td className="px-3 py-2 text-center text-gray-600">{item.duration_days}</td>
                       </tr>
                     ))}

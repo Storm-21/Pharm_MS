@@ -77,9 +77,12 @@ def main():
     from app.data.seed_medicines_batch6 import BATCH6_GUIDES as G6
     from app.data.seed_medicines_batch7 import (BATCH7_MEDICINES as B7,
                                                 BATCH7_GUIDES as G7)
+    from app.data.seed_medicines_batch8 import (BATCH8_MEDICINES as B8,
+                                                BATCH8_GUIDES as G8)
 
     batches = [('base', B1, G1), ('extra', B2, G2), ('batch3', B3, G3),
-               ('batch4', B4, G4), ('batch5', B5, G5), ('batch7', B7, G7)]
+               ('batch4', B4, G4), ('batch5', B5, G5), ('batch7', B7, G7),
+               ('batch8', B8, G8)]
     # Batch 6 supplies guidance only, for medicines the earlier batches defined
     # without a dose. It is folded in as an empty medicine list plus its guides,
     # so the duplicate-name and count assertions below still see one catalogue.

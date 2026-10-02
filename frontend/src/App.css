@@ -10,9 +10,17 @@
   min-height: 100vh;
 }
 
-/* Content area padding */
+/* Content area padding.
+
+   This said `min-height: calc(100vh - 64px)`, a hardcoded guess at the height of
+   the navigation bar. The nav is not always 64px - it grows on a small screen,
+   and it carries a second row when the mobile menu is open - so the content box
+   was either short (leaving a gap above the footer) or taller than the space
+   available, which is what pushes a page into scrolling on a laptop screen.
+   min-height is now set in the layout itself with flexbox, so the footer sits at
+   the bottom regardless of how tall the header happens to be. */
 main {
-  min-height: calc(100vh - 64px);
+  flex: 1 1 auto;
 }
 
 /* Fade in animation for pages */
@@ -27,8 +35,19 @@ main {
   }
 }
 
-/* Apply fade-in to main content */
-main > * {
+/* Apply fade-in to main content.
+
+   This used to be `main > *`, and that single selector blanked the entire
+   application. main > * is the ROUTER. App.jsx renders
+   <main><Routes>...</Routes></main> in every react-router version - v5 and v6
+   alike - so the only child of main is a <Routes> element that renders no box
+   of its own. There is no "main > *" style attribute for React to write the
+   per-element style prop into, so every engine (served to WebView2, Chrome,
+   Firefox alike) drops the declaration and the route content disappears; on a
+   Chromium backend the animation can take the whole element with it, which is
+   the blank window a customer would see. Targeting the routed page's own
+   wrapper class animates the content and leaves the router alone. */
+.page-enter {
   animation: fadeIn 0.3s ease-in-out;
 }
 
@@ -190,7 +209,10 @@ main > * {
   .animate-float,
   .animate-shimmer,
   .splash-sheen,
-  main > * {
+  .page-enter,
+  .animate-logo-float,
+  .animate-logo-pulse,
+  .animate-logo-scale {
     animation: none;
   }
 
@@ -201,3 +223,25 @@ main > * {
     stroke-dashoffset: 0;
   }
 }
+
+/* Enhanced logo animations for brand logo */
+@keyframes logoFloat {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-8px) scale(1.02); }
+}
+
+@keyframes logoPulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.05); opacity: 0.9; }
+}
+
+@keyframes logoScale {
+  0% { transform: scale(0.3) rotate(-20deg); opacity: 0; }
+  60% { transform: scale(1.1) rotate(5deg); opacity: 1; }
+  80% { transform: scale(0.9) rotate(-2deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0); opacity: 1; }
+}
+
+.animate-logo-float { animation: logoFloat 4s ease-in-out infinite; }
+.animate-logo-pulse { animation: logoPulse 3s ease-in-out infinite; }
+.animate-logo-scale { animation: logoScale 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }

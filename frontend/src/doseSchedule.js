@@ -42,3 +42,22 @@ export function describeDosePattern(value) {
   });
   return taken.length ? taken.join(', ') : null;
 }
+
+/**
+ * Format dose schedule for enhanced readability, optionally replacing zeros with dots
+ * for better visual distinction (e.g., "0-0-1" -> ".-.-1")
+ * @param {string} value - The dose schedule string (e.g., "1-0-1")
+ * @param {boolean} useDots - Whether to replace zeros with dots for visual clarity
+ * @returns {string} Formatted schedule string
+ */
+export function formatDoseSchedule(value, useDots = false) {
+  if (!doseScheduleValid(value)) return value;
+  const parts = String(value).trim().split('-');
+
+  if (useDots) {
+    // Replace zeros with dots for better visual distinction
+    return parts.map(part => part === '0' || part === '0.0' ? '.' : part).join('-');
+  }
+
+  return value;
+}

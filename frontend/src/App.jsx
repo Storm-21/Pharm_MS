@@ -89,9 +89,11 @@ function App() {
 
   return (
     <Router>
-      <div className="min-h-screen bg-gray-50">
+      <div className="flex min-h-screen flex-col bg-gray-50">
         <Navigation branding={branding} />
-        <main className="max-w-7xl mx-auto px-4 py-8">
+        {/* The routed page carries .page-enter so the fade-in applies to the
+            content rather than to the <Routes> element. See App.css. */}
+        <main className="page-enter mx-auto w-full max-w-7xl flex-1 px-4 py-6 sm:px-6 sm:py-8">
           <Routes>
             <Route path="/" element={<DashboardPage />} />
             <Route path="/workbench" element={<ClinicalWorkbench />} />

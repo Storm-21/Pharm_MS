@@ -91,7 +91,9 @@ export function SplashScreen({ branding, onFinish }) {
             <img
               src="/api/branding/logo"
               alt={appName}
-              className="h-24 w-24 object-contain drop-shadow-[0_0_28px_rgba(34,211,238,0.35)]"
+              className={`h-24 w-24 object-contain drop-shadow-[0_0_28px_rgba(34,211,238,0.35)] transition-all duration-700 ${
+                phase >= 2 ? 'animate-logo-scale animate-logo-float' : 'opacity-0'
+              }`}
               onError={() => setLogoOk(false)}
             />
           ) : (

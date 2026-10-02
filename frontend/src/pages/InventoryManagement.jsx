@@ -53,8 +53,7 @@ export function InventoryManagement() {
   useEffect(() => {
     fetchInventory();
     fetchAlerts();
-    fetchSummary();
-  }, [fetchInventory, fetchAlerts, fetchSummary]);
+  }, [fetchInventory, fetchAlerts]);
 
   const handleAddInventory = async (e) => {
     e.preventDefault();
@@ -88,15 +87,6 @@ export function InventoryManagement() {
     }
   };
 
-  const fetchSummary = useCallback(async () => {
-    try {
-      const response = await apiClient.getInventorySummary();
-      setSummary(response.data);
-    } catch (error) {
-      console.error('Error fetching summary:', error);
-    }
-  }, []);
-
   // --- Free-panel state -----------------------------------------------------
   // editing: the inventory row being edited (edit drawer open when non-null)
   // editForm: its editable fields
@@ -109,8 +99,7 @@ export function InventoryManagement() {
   const refresh = useCallback(() => {
     fetchInventory();
     fetchAlerts();
-    fetchSummary();
-  }, [fetchInventory, fetchAlerts, fetchSummary]);
+  }, [fetchInventory, fetchAlerts]);
 
   const openEdit = (item) => {
     setEditing(item);
@@ -208,10 +197,79 @@ export function InventoryManagement() {
     }
   };
 
+  // --- Shared row pieces ----------------------------------------------------
+  // The wide table and the narrow card list render the same three things. They
+  // are defined once here rather than duplicated, so the mobile view cannot
+  // drift away from the desktop one as the actions change.
+
+  // Editable at will: click the cell, type the shelf, press Enter or click away
+  // and it saves. `wide` widens the field for the card layout, where it is the
+  // full width of its row rather than a column.
+  const renderLocationInput = (item, wide = false) => (
+    <input
+      type="text"
+      defaultValue={item.storage_location || ''}
+      value={locationDrafts[item.id] ?? undefined}
+      onChange={(e) => handleLocationChange(item.id, e.target.value)}
+      onBlur={() => handleLocationCommit(item)}
+      onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }}
+      placeholder="e.g., Shelf A1"
+      className={`${wide ? 'w-full' : 'w-28'} px-2 py-1 border border-transparent rounded hover:border-gray-300 focus:border-blue-500 focus:outline-none text-sm text-gray-600 bg-gray-50 focus:bg-white`}
+      title="Click to edit where this medicine is kept"
+    />
+  );
+
+  const renderStatusBadge = (status) => (
+    <span className={`whitespace-nowrap rounded px-2 py-1 text-xs font-semibold ${getStatusBadge(status)}`}>
+      {status.replace('_', ' ').toUpperCase()}
+    </span>
+  );
+
+  // The full action set, shared by both layouts.
+  const renderRowActions = (item) => (
+    <>
+      <button
+        onClick={() => handleStockUpdate(item.id, 10)}
+        className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs hover:bg-green-200"
+        title="Add 10 units"
+      >
+        +10
+      </button>
+      <button
+        onClick={() => handleStockUpdate(item.id, -5)}
+        className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs hover:bg-red-200"
+        title="Remove 5 units"
+      >
+        -5
+      </button>
+      <button
+        onClick={() => setStockEntry({ id: item.id, name: item.medicine_name, amount: '', mode: 'add' })}
+        className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs hover:bg-blue-200"
+        title="Add or remove any amount"
+      >
+        ± Qty
+      </button>
+      <button
+        onClick={() => openEdit(item)}
+        className="px-2 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+        title="Edit details, batch, expiry or location"
+      >
+        <Pencil className="w-3.5 h-3.5" />
+      </button>
+      <button
+        onClick={() => setDeleteTarget(item)}
+        className="px-2 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200"
+        title="Remove this stock line"
+      >
+        <Trash2 className="w-3.5 h-3.5" />
+      </button>
+    </>
+  );
+
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-gray-800">Inventory Management</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-bold text-gray-800 sm:text-3xl">Inventory Management</h1>
         <button
           onClick={() => setShowAddModal(true)}
           className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-blue-700"
@@ -235,13 +293,19 @@ export function InventoryManagement() {
           <div className="rounded-lg bg-white p-4 shadow">
             <p className="text-xs uppercase tracking-wide text-gray-500">Value at cost</p>
             <p className="text-2xl font-bold text-gray-800">
-              \u20b9{summary.stock_value_at_cost.toLocaleString('en-IN')}
+              ₹{Number(summary.stock_value_at_cost).toLocaleString('en-IN', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
             </p>
           </div>
           <div className="rounded-lg bg-white p-4 shadow">
             <p className="text-xs uppercase tracking-wide text-gray-500">Value at retail</p>
             <p className="text-2xl font-bold text-gray-800">
-              \u20b9{summary.stock_value_at_retail.toLocaleString('en-IN')}
+              ₹{Number(summary.stock_value_at_retail).toLocaleString('en-IN', {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
+              })}
             </p>
           </div>
         </div>
@@ -330,93 +394,100 @@ export function InventoryManagement() {
         ) : inventory.length === 0 ? (
           <div className="p-8 text-center text-gray-500">No inventory items found</div>
         ) : (
-          <table className="w-full text-sm">
-            <thead className="bg-gray-100 border-b">
-              <tr>
-                <th className="px-4 py-3 text-left font-semibold text-gray-700">Medicine</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-700">Batch #</th>
-                <th className="px-4 py-3 text-center font-semibold text-gray-700">Stock</th>
-                <th className="px-4 py-3 text-center font-semibold text-gray-700">Reorder Level</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-700">Expiry Date</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-700">Location</th>
-                <th className="px-4 py-3 text-center font-semibold text-gray-700">Status</th>
-                <th className="px-4 py-3 text-center font-semibold text-gray-700">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
+          <>
+            {/* WIDE SCREENS: the sortable table a pharmacist scans down.
+
+                `hidden lg:block` rather than `overflow-x-auto`: eight columns of
+                stock data do not become readable by letting the reader scroll a
+                table sideways, and a pharmacist on a 1366-wide counter display
+                should not have to. Below lg the card list takes over. */}
+            <div className="hidden lg:block">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-100 border-b">
+                  <tr>
+                    <th className="px-4 py-3 text-left font-semibold text-gray-700">Medicine</th>
+                    <th className="px-4 py-3 text-left font-semibold text-gray-700">Batch #</th>
+                    <th className="px-4 py-3 text-center font-semibold text-gray-700">Stock</th>
+                    <th className="px-4 py-3 text-center font-semibold text-gray-700">Reorder Level</th>
+                    <th className="px-4 py-3 text-left font-semibold text-gray-700">Expiry Date</th>
+                    <th className="px-4 py-3 text-left font-semibold text-gray-700">Location</th>
+                    <th className="px-4 py-3 text-center font-semibold text-gray-700">Status</th>
+                    <th className="px-4 py-3 text-center font-semibold text-gray-700">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {inventory.map((item) => (
+                    <tr key={item.id} className="border-b hover:bg-gray-50">
+                      <td className="px-4 py-3">
+                        <div className="text-gray-900 font-medium">{item.medicine_name}</div>
+                        {item.manufacturer && (
+                          <div className="text-xs text-gray-500">{item.manufacturer}</div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-gray-600">{item.batch_number}</td>
+                      <td className="px-4 py-3 text-center text-gray-900 font-semibold">{item.quantity_in_stock}</td>
+                      <td className="px-4 py-3 text-center text-gray-600">{item.reorder_level}</td>
+                      <td className="px-4 py-3 text-gray-600">{item.expiry_date}</td>
+                      <td className="px-4 py-3">{renderLocationInput(item)}</td>
+                      <td className="px-4 py-3 text-center">{renderStatusBadge(item.status)}</td>
+                      <td className="px-4 py-3 text-center">
+                        <div className="flex items-center justify-center gap-1 whitespace-nowrap">
+                          {renderRowActions(item)}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* NARROW SCREENS: the same row restated as a card, so nothing is
+                hidden behind a horizontal scroll. Every control the table
+                offers is present here too - a mobile view that silently drops
+                the edit button is a second, worse application. */}
+            <ul className="divide-y divide-gray-200 lg:hidden">
               {inventory.map((item) => (
-                <tr key={item.id} className="border-b hover:bg-gray-50">
-                  <td className="px-4 py-3">
-                    <div className="text-gray-900 font-medium">{item.medicine_name}</div>
-                    {item.manufacturer && (
-                      <div className="text-xs text-gray-500">{item.manufacturer}</div>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-gray-600">{item.batch_number}</td>
-                  <td className="px-4 py-3 text-center text-gray-900 font-semibold">{item.quantity_in_stock}</td>
-                  <td className="px-4 py-3 text-center text-gray-600">{item.reorder_level}</td>
-                  <td className="px-4 py-3 text-gray-600">{item.expiry_date}</td>
-                  <td className="px-4 py-3">
-                    {/* Editable at will, as asked: click the cell, type the
-                        shelf, press Enter or click away, it saves. */}
-                    <input
-                      type="text"
-                      defaultValue={item.storage_location || ''}
-                      value={locationDrafts[item.id] ?? undefined}
-                      onChange={(e) => handleLocationChange(item.id, e.target.value)}
-                      onBlur={() => handleLocationCommit(item)}
-                      onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur(); }}
-                      placeholder="e.g., Shelf A1"
-                      className="w-28 px-2 py-1 border border-transparent rounded hover:border-gray-300 focus:border-blue-500 focus:outline-none text-sm text-gray-600 bg-gray-50 focus:bg-white"
-                      title="Click to edit where this medicine is kept"
-                    />
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <span className={`px-2 py-1 rounded text-xs font-semibold ${getStatusBadge(item.status)}`}>
-                      {item.status.replace('_', ' ').toUpperCase()}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-center space-x-1 whitespace-nowrap">
-                    <button
-                      onClick={() => handleStockUpdate(item.id, 10)}
-                      className="px-2 py-1 bg-green-100 text-green-700 rounded text-xs hover:bg-green-200"
-                      title="Add 10 units"
-                    >
-                      +10
-                    </button>
-                    <button
-                      onClick={() => handleStockUpdate(item.id, -5)}
-                      className="px-2 py-1 bg-red-100 text-red-700 rounded text-xs hover:bg-red-200"
-                      title="Remove 5 units"
-                    >
-                      -5
-                    </button>
-                    <button
-                      onClick={() => setStockEntry({ id: item.id, name: item.medicine_name, amount: '', mode: 'add' })}
-                      className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs hover:bg-blue-200"
-                      title="Add or remove any amount"
-                    >
-                      ± Qty
-                    </button>
-                    <button
-                      onClick={() => openEdit(item)}
-                      className="px-2 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
-                      title="Edit details, batch, expiry or location"
-                    >
-                      <Pencil className="w-3.5 h-3.5" />
-                    </button>
-                    <button
-                      onClick={() => setDeleteTarget(item)}
-                      className="px-2 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200"
-                      title="Remove this stock line"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </td>
-                </tr>
+                <li key={item.id} className="space-y-3 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate font-medium text-gray-900">{item.medicine_name}</p>
+                      {item.manufacturer && (
+                        <p className="truncate text-xs text-gray-500">{item.manufacturer}</p>
+                      )}
+                    </div>
+                    {renderStatusBadge(item.status)}
+                  </div>
+
+                  <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm sm:grid-cols-4">
+                    <div>
+                      <dt className="text-xs uppercase tracking-wide text-gray-500">Stock</dt>
+                      <dd className="font-semibold text-gray-900">{item.quantity_in_stock}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs uppercase tracking-wide text-gray-500">Reorder</dt>
+                      <dd className="text-gray-700">{item.reorder_level}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs uppercase tracking-wide text-gray-500">Batch</dt>
+                      <dd className="truncate text-gray-700">{item.batch_number}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs uppercase tracking-wide text-gray-500">Expiry</dt>
+                      <dd className="text-gray-700">{item.expiry_date}</dd>
+                    </div>
+                    <div className="col-span-2 sm:col-span-4">
+                      <dt className="mb-1 text-xs uppercase tracking-wide text-gray-500">Location</dt>
+                      <dd>{renderLocationInput(item, true)}</dd>
+                    </div>
+                  </dl>
+
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {renderRowActions(item)}
+                  </div>
+                </li>
               ))}
-            </tbody>
-          </table>
+            </ul>
+          </>
         )}
       </div>
 

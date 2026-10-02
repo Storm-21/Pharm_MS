@@ -30,6 +30,7 @@ from app.data.seed_medicines_batch5 import BATCH5_MEDICINES, BATCH5_GUIDES
 # is unchanged - see the module docstring.
 from app.data.seed_medicines_batch6 import BATCH6_GUIDES
 from app.data.seed_medicines_batch7 import (BATCH7_MEDICINES, BATCH7_GUIDES)
+from app.data.seed_medicines_batch8 import (BATCH8_MEDICINES, BATCH8_GUIDES)
 from app.security import apply_seal
 # Batch order is deliberate: later batches extend earlier ones, and the
 # duplicate-name guard in ensure_seeded() rejects an accidental re-add rather
@@ -41,10 +42,11 @@ from app.security import apply_seal
 # asserts the loaded count against the sum of the batches precisely so that
 # cannot go unnoticed again.
 MEDICINES = (_BASE_MEDICINES + EXTRA_MEDICINES + BATCH3_MEDICINES
-             + BATCH4_MEDICINES + BATCH5_MEDICINES + BATCH7_MEDICINES)
+             + BATCH4_MEDICINES + BATCH5_MEDICINES + BATCH7_MEDICINES
+             + BATCH8_MEDICINES)
 DOSAGE_GUIDES = (_BASE_GUIDES + EXTRA_DOSAGE_GUIDES + BATCH3_GUIDES
                  + BATCH4_GUIDES + BATCH5_GUIDES + BATCH6_GUIDES
-                 + BATCH7_GUIDES)
+                 + BATCH7_GUIDES + BATCH8_GUIDES)
 
 # Opening stock per medicine: (quantity, reorder_level, max_stock, storage_location)
 # Chosen so that most lines are healthy and a handful trip the reorder alert.
@@ -254,6 +256,16 @@ OPENING_STOCK = {
     "Hydroxychloroquine 200mg": (52, 20, 130, "Shelf I1 - Rheumatology"),
     "Dexamethasone 0.5mg": (118, 35, 260, "Shelf I2 - Corticosteroids"),
     "Clobetasol Propionate 0.05% Cream": (58, 18, 140, "Shelf B3 - Dermatology"),
+
+    # --- Batch 8: dermatology and topical care ---------------------------
+    "Adapalene 0.1% Gel": (72, 20, 200, "Shelf J2 - Dermatology"),
+    "Tretinoin 0.025% Cream": (65, 18, 180, "Shelf J2 - Dermatology"),
+    "Benzoyl Peroxide 2.5% Gel": (88, 22, 220, "Shelf J2 - Dermatology"),
+    "Clindamycin 1% + Benzoyl Peroxide 3.75% Gel": (54, 15, 150, "Shelf J2 - Dermatology"),
+    "Tacrolimus 0.03% Ointment": (38, 10, 100, "Shelf J2 - Dermatology"),
+    "Permethrin 5% Cream": (60, 16, 160, "Shelf J2 - Dermatology"),
+    "Urea 10% Cream": (95, 25, 250, "Shelf J2 - Dermatology"),
+    "Clobetasol Propionate 0.05% Ointment": (74, 20, 200, "Shelf J2 - Dermatology"),
     "Amitriptyline 10mg": (92, 30, 210, "Shelf J1 - Neurology"),
     "Flunarizine 10mg": (44, 18, 120, "Shelf J1 - Neurology"),
     "Propranolol 20mg": (86, 30, 200, "Shelf D2 - Cardiovascular"),

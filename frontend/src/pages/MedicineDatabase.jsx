@@ -281,10 +281,17 @@ function MedicineDetail({ medicine, onClose, onEdit }) {
       >
         <div className="sticky top-0 flex items-start justify-between border-b bg-white px-6 py-4">
           <div>
-            <h2 className="text-xl font-bold text-gray-900">{medicine.name}</h2>
+            <h2 className="text-xl font-bold text-gray-900">
+              {medicine.brand_name || medicine.name}
+              {medicine.brand_name && medicine.brand_name !== medicine.name ? (
+                <span className="text-xs opacity-75 ml-1">({medicine.name})</span>
+              ) : null}
+            </h2>
             <p className="text-sm text-gray-500">
               {medicine.generic_name}
-              {medicine.brand_name ? ` \u00b7 ${medicine.brand_name}` : ''}
+              {!medicine.brand_name || medicine.brand_name === medicine.name ? null : (
+                <span className="ml-1">\u2022 {medicine.brand_name}</span>
+              )}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -553,6 +560,8 @@ export function MedicineDatabase() {
                 <th className="px-4 py-3 text-left font-semibold text-gray-700">Formula</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-700">Manufacturer</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-700">Strength</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-700">Therapeutic Class</th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-700">Use Case</th>
                 <th className="px-4 py-3 text-left font-semibold text-gray-700">Price</th>
                 <th className="px-4 py-3 text-center font-semibold text-gray-700">Actions</th>
               </tr>
@@ -560,13 +569,24 @@ export function MedicineDatabase() {
             <tbody>
               {medicines.map((medicine) => (
                 <tr key={medicine.id} className="border-b hover:bg-gray-50">
-                  <td className="px-4 py-3 font-medium text-gray-900">{medicine.name}</td>
+                  <td className="px-4 py-3 font-medium text-gray-900">
+                    {medicine.brand_name || medicine.name}
+                    {medicine.brand_name && medicine.brand_name !== medicine.name ? (
+                      <span className="text-xs opacity-75 ml-1">({medicine.name})</span>
+                    ) : null}
+                  </td>
                   <td className="px-4 py-3 text-gray-600">{medicine.generic_name}</td>
                   <td className="px-4 py-3 font-mono text-xs text-gray-600">
                     {medicine.molecular_formula || '\u2014'}
                   </td>
                   <td className="px-4 py-3 text-gray-600">{medicine.manufacturer}</td>
                   <td className="px-4 py-3 text-gray-600">{medicine.strength}</td>
+                  <td className="px-4 py-3 text-gray-600">
+                    {medicine.therapeutic_class || '\u2014'}
+                  </td>
+                  <td className="px-4 py-3 text-gray-600">
+                    {medicine.use_case || '\u2014'}
+                  </td>
                   <td className="px-4 py-3 font-semibold text-gray-900">
                     {medicine.selling_price != null ? `\u20b9${medicine.selling_price}` : '\u2014'}
                   </td>
