@@ -87,15 +87,15 @@ def _brand_header():
 
 
 BASE_CSS = """
-  @page { size: A4; margin: 12mm; }
+  @page { size: A4; margin: 10mm; }
   * { box-sizing: border-box; }
   body {
     font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    color: #111827; margin: 0; padding: 24px; background: #f3f4f6;
-    font-size: 12.5px; line-height: 1.45;
+    color: #111827; margin: 0; padding: 20px; background: #f3f4f6;
+    font-size: 12px; line-height: 1.4;
   }
   .sheet {
-    max-width: 210mm; margin: 0 auto; background: #fff; padding: 12mm;
+    max-width: 210mm; margin: 0 auto; background: #fff; padding: 10mm 12mm;
     box-shadow: 0 1px 3px rgba(0,0,0,.12); position: relative;
   }
   /* Faint paper guilloche - the fine engraved border a real prescription pad
@@ -124,10 +124,10 @@ BASE_CSS = """
            letter-spacing: .06em; }
   .value { font-weight: 600; }
   table { width: 100%; border-collapse: collapse; margin-top: 6px; }
-  th { background: #eff6ff; color: #1e3a8a; text-align: left; font-size: 11px;
+  th { background: #eff6ff; color: #1e3a8a; text-align: left; font-size: 10.5px;
        text-transform: uppercase; letter-spacing: .05em;
-       padding: 7px 9px; border-bottom: 1px solid #bfdbfe; }
-  td { padding: 7px 9px; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
+       padding: 6px 10px; border-bottom: 1px solid #bfdbfe; }
+  td { padding: 8px 10px; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
   tr:nth-child(even) td { background: #fbfdff; }
   .section { margin-top: 16px; }
   .section h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .07em;
@@ -204,9 +204,41 @@ BASE_CSS = """
   .inscription th { background: #faf8f3; color: #1e3a8a; border-bottom: 1px solid #d7d2c4; }
   .rx-num { font-weight: 700; color: #1e3a8a; text-align: center; width: 30px; }
   .rx-num::after { content: ")"; }
-  .sig { font-family: Georgia, "Times New Roman", serif; font-style: italic;
-         color: #1f2937; font-size: 12px; }
-  .sig .lat { font-style: normal; font-weight: 600; letter-spacing: .04em; }
+        /* Sig. - dose format with prominent schedule pattern */
+        .rx-dose {
+          font-size: 13px; font-weight: 600; color: #1f2937;
+          letter-spacing: 0.02em;
+        }
+        .rx-dose .amount {
+          font-size: 14px; font-weight: 700; color: #1e3a8a;
+        }
+        .rx-dose .unit {
+          font-size: 11px; font-weight: 500; color: #4b5563;
+        }
+        .rx-dose .unit-ml {
+          color: #dc2626; font-weight: 700;
+        }
+        .rx-dose .freq {
+          font-size: 11px; color: #6b7280; margin-left: 4px;
+        }
+        .rx-dose .schedule {
+          display: block; margin-top: 3px; font-size: 12px;
+          font-family: "Courier New", Courier, monospace;
+          font-weight: 700; letter-spacing: 0.12em;
+          color: #1e3a8a; background: #eff6ff;
+          padding: 2px 8px; border-radius: 4px;
+          width: fit-content;
+        }
+        .rx-dose .schedule-desc {
+          display: block; font-size: 10px; color: #6b7280;
+          margin-top: 1px; font-style: italic;
+        }
+        .rx-syrup-badge {
+          display: inline-block; background: #fef3c7; color: #92400e;
+          font-size: 9px; font-weight: 700; padding: 1px 5px;
+          border-radius: 3px; margin-left: 4px; text-transform: uppercase;
+          letter-spacing: 0.05em; border: 1px solid #fde68a;
+        }
 
   /* --- 6/7. Subscription + signatura + renewal --------------------------- */
   .subscription { margin-top: 10px; border: 1px solid #d7d2c4;
@@ -541,10 +573,10 @@ def prescription_report(prescription_id):
     <div class="inscription">
       <table>
         <thead>
-          <tr><th style="width:26px">#</th><th style="width:27%">Medicine &amp; strength</th>
-              <th style="width:30%">Sig. &mdash; direction to the patient</th>
-              <th style="width:70px;text-align:center">Qty to dispense</th>
-              <th style="width:22%">Route / schedule</th></tr>
+          <tr><th style="width:32px">#</th><th style="width:28%">Medicine &amp; strength</th>
+              <th style="width:34%">Sig. &mdash; direction to the patient</th>
+              <th style="width:14%;text-align:center">Qty to dispense</th>
+              <th style="width:12%">Route / schedule</th></tr>
         </thead>
         <tbody>{rows}</tbody>
       </table>
@@ -612,11 +644,16 @@ def _inscription_rows(prescription):
         # special direction - so it reads correctly to a pharmacist.
         dose_bit = f'{_format_num(item.dosage_amount)} {_e(item.dosage_unit)}'.strip()
         freq_bit = _sig_abbrev(item.frequency)
-        sig_html = f'<span class="lat">{dose_bit}</span>'
-        if freq_bit:
-            sig_html += f' &mdash; <span class="lat">{freq_bit}</span>'
+        is_syrup = (item.medicine_form or '').lower() == 'syrup'
+        unit_class = 'unit unit-ml' if is_syrup else 'unit'
+        syrup_badge = '<span class="rx-syrup-badge">Syrup</span>' if is_syrup else ''
+        sig_html = (f'<span class="rx-dose">'
+                    f'<span class="amount">{_format_num(item.dosage_amount)}</span> '
+                    f'<span class="{unit_class}">{_e(item.dosage_unit)}{syrup_badge}</span>'
+                    f'<span class="freq">{f" &mdash; {freq_bit}" if freq_bit else ""}</span>'
+                    f'</span>')
         if item.special_instructions:
-            sig_html += ' &mdash; ' + _e(item.special_instructions).rstrip('.')
+            sig_html += f'<br><span style="color:#6b7280;font-size:11px">{_e(item.special_instructions).rstrip(".")}</span>'
 
         # The dosing pattern is printed as its own emphasised line.
         #
@@ -629,10 +666,8 @@ def _inscription_rows(prescription):
         schedule = getattr(item, 'dose_schedule', None)
         if schedule and describe_dose_schedule(schedule):
             sig_html += (
-                f'<br><span class="doses" style="font-weight:600;'
-                f'letter-spacing:0.06em">{_e(schedule)}</span>'
-                f'<br><span style="color:#6b7280;font-size:10.5px">'
-                f'{_e(describe_dose_schedule(schedule))}</span>'
+                f'<span class="rx-dose"><span class="schedule">{_e(schedule)}</span>'
+                f'<span class="schedule-desc">{_e(describe_dose_schedule(schedule))}</span></span>'
             )
 
         # The generic name is what identifies the medicine clinically.

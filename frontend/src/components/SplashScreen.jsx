@@ -83,26 +83,38 @@ export function SplashScreen({ branding, onFinish }) {
       <div className="relative w-full max-w-lg px-8 text-center">
         {/* --- Host studio mark ------------------------------------------- */}
         <div
-          className={`mx-auto mb-7 flex h-28 w-28 items-center justify-center transition-all duration-700 ${
+          className={`mx-auto mb-7 relative flex h-28 w-28 items-center justify-center transition-all duration-700 ${
             phase >= 1 ? 'scale-100 opacity-100' : 'scale-75 opacity-0'
           }`}
         >
+          {/* Animated glow ring behind logo */}
+          {phase >= 1 && (
+            <div className="absolute inset-0 rounded-full bg-cyan-400/10 animate-ring-pulse" />
+          )}
+          {phase >= 2 && (
+            <div className="absolute inset-1 rounded-full bg-blue-400/8 animate-ring-pulse" style={{ animationDelay: '0.5s' }} />
+          )}
           {customised && logoOk ? (
             <img
               src="/api/branding/logo"
               alt={appName}
               className={`h-24 w-24 object-contain drop-shadow-[0_0_28px_rgba(34,211,238,0.35)] transition-all duration-700 ${
-                phase >= 2 ? 'animate-logo-scale animate-logo-float' : 'opacity-0'
+                phase >= 2 ? 'animate-logo-scale animate-logo-float animate-logo-glow' : 'opacity-0'
               }`}
               onError={() => setLogoOk(false)}
             />
           ) : (
-            <UnseenStudioMark
-              className={`h-28 w-28 transition-transform duration-1000 ${
+            <div className={`relative transition-all duration-1000 ${
                 phase >= 2 ? 'scale-90' : 'scale-100'
-              }`}
-              animated
-            />
+              }`}>
+              <div className="absolute inset-0 rounded-full bg-cyan-400/20 blur-xl" />
+              <UnseenStudioMark
+                className={`h-28 w-28 relative transition-transform duration-1000 ${
+                  phase >= 2 ? 'scale-90' : 'scale-100'
+                }`}
+                animated
+              />
+            </div>
           )}
         </div>
 

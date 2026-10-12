@@ -30,6 +30,7 @@ if not (FRONTEND_BUILD / 'index.html').exists():
 
 datas = [
     (str(FRONTEND_BUILD), 'frontend_build'),
+    (str(BACKEND_DIR / 'pharms.manifest'), '.'),
 ]
 
 # Hidden imports that Flask / SQLAlchemy / pywebview load dynamically and
@@ -111,6 +112,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    versioninfo='pharms.manifest',
     icon=str(BACKEND_DIR / 'pharms.ico') if (BACKEND_DIR / 'pharms.ico').exists() else None,
 )
 

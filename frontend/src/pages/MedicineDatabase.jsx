@@ -552,49 +552,55 @@ export function MedicineDatabase() {
         ) : medicines.length === 0 ? (
           <p className="p-8 text-center text-gray-500">No medicines found.</p>
         ) : (
-          <table className="w-full text-sm">
-            <thead className="border-b bg-gray-50">
+          <table className="min-w-full text-sm">
+            <thead className="border-b bg-gray-50 sticky top-0 z-10">
               <tr>
-                <th className="px-4 py-3 text-left font-semibold text-gray-700">Name</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-700">Generic</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-700">Formula</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-700">Manufacturer</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-700">Strength</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-700">Therapeutic Class</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-700">Use Case</th>
-                <th className="px-4 py-3 text-left font-semibold text-gray-700">Price</th>
-                <th className="px-4 py-3 text-center font-semibold text-gray-700">Actions</th>
+                <th className="px-3 py-3 text-left font-semibold text-gray-700 whitespace-nowrap">Brand Name</th>
+                <th className="px-3 py-3 text-left font-semibold text-gray-700 whitespace-nowrap">Generic</th>
+                <th className="px-3 py-3 text-left font-semibold text-gray-700 hidden lg:table-cell">Formula</th>
+                <th className="px-3 py-3 text-left font-semibold text-gray-700 whitespace-nowrap">Manufacturer</th>
+                <th className="px-3 py-3 text-left font-semibold text-gray-700 whitespace-nowrap">Strength</th>
+                <th className="px-3 py-3 text-left font-semibold text-gray-700 whitespace-nowrap hidden md:table-cell">Therapeutic Class</th>
+                <th className="px-3 py-3 text-left font-semibold text-gray-700 hidden xl:table-cell">Use Case</th>
+                <th className="px-3 py-3 text-left font-semibold text-gray-700 whitespace-nowrap">Price</th>
+                <th className="px-3 py-3 text-center font-semibold text-gray-700 whitespace-nowrap">Actions</th>
               </tr>
             </thead>
             <tbody>
               {medicines.map((medicine) => (
-                <tr key={medicine.id} className="border-b hover:bg-gray-50">
-                  <td className="px-4 py-3 font-medium text-gray-900">
-                    {medicine.brand_name || medicine.name}
-                    {medicine.brand_name && medicine.brand_name !== medicine.name ? (
-                      <span className="text-xs opacity-75 ml-1">({medicine.name})</span>
-                    ) : null}
+                <tr key={medicine.id} className="border-b hover:bg-blue-50/50 transition-colors duration-150 cursor-default">
+                  <td className="px-3 py-3 font-medium text-gray-900 max-w-[200px]">
+                    <div className="truncate" title={`${medicine.brand_name || medicine.name}${medicine.brand_name && medicine.brand_name !== medicine.name ? ` (${medicine.name})` : ''}`}>
+                      {medicine.brand_name || medicine.name}
+                      {medicine.brand_name && medicine.brand_name !== medicine.name ? (
+                        <span className="text-xs opacity-60 ml-1">({medicine.name})</span>
+                      ) : null}
+                    </div>
                   </td>
-                  <td className="px-4 py-3 text-gray-600">{medicine.generic_name}</td>
-                  <td className="px-4 py-3 font-mono text-xs text-gray-600">
+                  <td className="px-3 py-3 text-gray-600 max-w-[120px]">
+                    <div className="truncate" title={medicine.generic_name}>{medicine.generic_name}</div>
+                  </td>
+                  <td className="px-3 py-3 font-mono text-xs text-gray-500 hidden lg:table-cell">
                     {medicine.molecular_formula || '\u2014'}
                   </td>
-                  <td className="px-4 py-3 text-gray-600">{medicine.manufacturer}</td>
-                  <td className="px-4 py-3 text-gray-600">{medicine.strength}</td>
-                  <td className="px-4 py-3 text-gray-600">
-                    {medicine.therapeutic_class || '\u2014'}
+                  <td className="px-3 py-3 text-gray-600 max-w-[140px]">
+                    <div className="truncate" title={medicine.manufacturer}>{medicine.manufacturer}</div>
                   </td>
-                  <td className="px-4 py-3 text-gray-600">
-                    {medicine.use_case || '\u2014'}
+                  <td className="px-3 py-3 text-gray-600 whitespace-nowrap">{medicine.strength}</td>
+                  <td className="px-3 py-3 text-gray-600 max-w-[160px] hidden md:table-cell">
+                    <div className="truncate" title={medicine.therapeutic_class}>{medicine.therapeutic_class || '\u2014'}</div>
                   </td>
-                  <td className="px-4 py-3 font-semibold text-gray-900">
+                  <td className="px-3 py-3 text-gray-600 max-w-[200px] hidden xl:table-cell">
+                    <div className="truncate" title={medicine.use_case}>{medicine.use_case || '\u2014'}</div>
+                  </td>
+                  <td className="px-3 py-3 font-semibold text-gray-900 whitespace-nowrap">
                     {medicine.selling_price != null ? `\u20b9${medicine.selling_price}` : '\u2014'}
                   </td>
-                  <td className="px-4 py-3">
-                    <div className="flex justify-center gap-2">
+                  <td className="px-3 py-3">
+                    <div className="flex justify-center gap-1">
                       <button
                         onClick={() => openDetail(medicine.id)}
-                        className="text-blue-600 hover:text-blue-800"
+                        className="rounded p-1.5 text-blue-600 hover:bg-blue-100 transition-all duration-150 hover:scale-110"
                         title="View full record"
                       >
                         <Eye className="h-4 w-4" />
@@ -605,14 +611,14 @@ export function MedicineDatabase() {
                           setFormData({ ...EMPTY_MEDICINE, ...medicine });
                           setShowModal(true);
                         }}
-                        className="text-green-600 hover:text-green-800"
+                        className="rounded p-1.5 text-green-600 hover:bg-green-100 transition-all duration-150 hover:scale-110"
                         title="Edit"
                       >
                         <Edit className="h-4 w-4" />
                       </button>
                       <button
                         onClick={() => handleDelete(medicine)}
-                        className="text-red-500 hover:text-red-700"
+                        className="rounded p-1.5 text-red-500 hover:bg-red-100 transition-all duration-150 hover:scale-110"
                         title="Delete"
                       >
                         <Trash2 className="h-4 w-4" />
