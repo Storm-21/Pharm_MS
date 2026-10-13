@@ -866,6 +866,7 @@ def _sig_abbrev(frequency):
     return text
 
 
+@report_bp.route('/patient/<int:patient_id>', methods=['GET'])
 def patient_report(patient_id):
     """
     Full patient history: demographics, allergies, conditions and every
