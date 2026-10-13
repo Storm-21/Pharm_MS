@@ -414,24 +414,63 @@ class DosageCalculator:
             result['dose_ceiling_warning'] = ceiling_finding
         return result
     
+    _FREQ_MAP = {
+        'once': 1, '1 time': 1, 'single': 1, 'stat': 1,
+        'twice': 2, 'bid': 2, '2 times': 2,
+        'thrice': 3, 'tid': 3, '3 times': 3,
+        'qid': 4, '4 times': 4,
+        'q4h': 6, 'q6h': 4, 'q8h': 3, 'q12h': 2,
+        'qn': 1, 'hs': 1,
+    }
+
+    @staticmethod
+    def _parse_frequency(frequency_str):
+        """Convert a frequency string to a numeric dose count per day."""
+        if frequency_str is None:
+            return None
+        text = str(frequency_str).strip().lower()
+        # Direct number prefix: "2 times", "3x", "4 daily"
+        parts = text.split()
+        if parts:
+            try:
+                return int(parts[0])
+            except ValueError:
+                pass
+            # Numeric prefix with trailing letter: "2x"
+            first = parts[0]
+            if first.endswith('x'):
+                try:
+                    return int(first[:-1])
+                except ValueError:
+                    pass
+        # Exact keyword match
+        if text in DosageCalculator._FREQ_MAP:
+            return DosageCalculator._FREQ_MAP[text]
+        # Substring match: find any keyword inside the phrase
+        for keyword, count in DosageCalculator._FREQ_MAP.items():
+            if keyword in text:
+                return count
+        return None
+
     @staticmethod
     def calculate_total_dosage(dosage_amount, frequency_str, duration_days):
         """
         Calculate total amount of medicine needed for entire duration
-        frequency_str example: "2 times a day", "3 times daily"
+        frequency_str example: "2 times a day", "3 times daily", "Twice daily"
         """
         try:
-            # Extract frequency number
-            frequency = int(frequency_str.split()[0])
+            frequency = DosageCalculator._parse_frequency(frequency_str)
+            if frequency is None or frequency <= 0:
+                return None
             total_doses = frequency * duration_days
             total_amount = dosage_amount * total_doses
-            
+
             return {
                 'total_amount': total_amount,
                 'total_doses': total_doses,
                 'total_amount_per_day': dosage_amount * frequency,
             }
-        except:
+        except Exception:
             return None
     
     @staticmethod

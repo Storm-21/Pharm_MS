@@ -206,7 +206,7 @@ export function PrescriptionManagement() {
       setError(null);
       await load();
     } catch (err) {
-      setError('Could not save the prescription.');
+      setError(err.message || 'Could not save the prescription.');
     } finally {
       setSaving(false);
     }

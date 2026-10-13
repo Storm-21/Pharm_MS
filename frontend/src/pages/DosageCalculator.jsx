@@ -497,8 +497,9 @@ export function DosageCalculator() {
               <div className="mt-4 flex items-start gap-2 rounded border-l-4 border-yellow-400 bg-yellow-50 p-3 text-sm text-yellow-800">
                 <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
                 <p>
-                  This dose is not weight-based. Record the patient’s weight
-                  on their record to enable an mg/kg calculation.
+                  {dosage.patient_weight_kg != null
+                    ? "This dose uses the stored age-band guide. Weight-based dosing is available only for patients under 18."
+                    : "No weight recorded for this patient. Record weight on their record to enable an mg/kg calculation."}
                 </p>
               </div>
             )}
