@@ -110,22 +110,6 @@ BATCH3_MEDICINES = [
     # CARDIOVASCULAR - fill out each class so there is a real choice
     # =================================================================== #
     _med(
-        "Losartan 50mg", "Losartan", "Antihypertensive - angiotensin receptor blocker",
-        "Selective AT1 receptor antagonist",
-        "Hypertension, diabetic nephropathy, heart failure, stroke prevention",
-        strength="50mg", form="tablet", route="Oral", brand="Losar 50",
-        manufacturer="Unichem Laboratories Ltd", site="Pithampur, Madhya Pradesh",
-        formula="C22H23ClN6O", weight="422.91 g/mol",
-        moa="Blocks angiotensin II binding at the AT1 receptor, reducing vasoconstriction and aldosterone release.",
-        side_effects="Dizziness, hyperkalaemia, hypotension, renal impairment",
-        contra="Pregnancy, bilateral renal artery stenosis, severe hepatic impairment",
-        warnings="Monitor potassium and creatinine after starting. Not interchangeable with beta-blockers in asthma.",
-        interactions="Potassium supplements, spironolactone, NSAIDs, lithium, other antihypertensives",
-        pregnancy="X - fetal renal damage; stop immediately if pregnancy occurs",
-        half_life="2 hours (active metabolite 6-9 hours)", onset="1 hour",
-        max_dose="100 mg/day", cost=1.8, price=4.2),
-
-    _med(
         "Valsartan 80mg", "Valsartan", "Antihypertensive - angiotensin receptor blocker",
         "Selective AT1 receptor antagonist",
         "Hypertension, heart failure, post-myocardial infarction",
@@ -632,21 +616,6 @@ BATCH3_MEDICINES = [
         cost=8.5, price=20.0),
 
     _med(
-        "Cefixime 200mg", "Cefixime", "Antibiotic - third generation cephalosporin",
-        "Beta-lactam; inhibits cell wall synthesis",
-        "Respiratory tract infection, urinary tract infection, otitis media, gonorrhoea",
-        strength="200mg", form="tablet", route="Oral", brand="Taxim-O 200",
-        manufacturer="Alkem Laboratories Ltd", site="Taloja, Maharashtra",
-        formula="C16H15N5O7S2", weight="453.45 g/mol",
-        moa="Binds penicillin-binding proteins and inhibits peptidoglycan cross-linking in the bacterial cell wall.",
-        side_effects="Diarrhoea, dyspepsia, rash, Clostridioides difficile colitis",
-        contra="Previous severe cephalosporin or penicillin anaphylaxis",
-        warnings="Cross-reactivity with penicillin allergy is around 1-2% - avoid if the penicillin reaction was anaphylactic. Complete the full course.",
-        interactions="Warfarin (INR rise), carbamazepine, antacids (reduced absorption)",
-        pregnancy="B", half_life="3-4 hours", max_dose="400 mg/day",
-        cost=6.5, price=16.0),
-
-    _med(
         "Ampicillin + Cloxacillin", "Ampicillin + Cloxacillin",
         "Antibiotic - penicillin combination",
         "Beta-lactam combination covering Gram-positive and Gram-negative organisms",
@@ -816,11 +785,6 @@ BATCH3_GUIDES = [
      "special_notes": "Start 25 mg in adolescents; closer monitoring for suicidal ideation is required."},
 
     # --- Losartan -------------------------------------------------------
-    {"medicine_name": "Losartan 50mg", "age_group": "18+", "dosage_amount": 50,
-     "dosage_unit": "mg", "frequency": "Once daily", "duration_days": 30,
-     "indication": "Hypertension",
-     "special_notes": "Usual start 50 mg once daily; range 25-100 mg. Check potassium and creatinine 1-2 weeks after starting or changing dose."},
-
     # --- Hydrochlorothiazide --------------------------------------------
     {"medicine_name": "Hydrochlorothiazide 25mg", "age_group": "18+",
      "dosage_amount": 25, "dosage_unit": "mg", "frequency": "Once daily",
@@ -881,11 +845,6 @@ BATCH3_GUIDES = [
      "special_notes": "Start with one inhalation twice daily in adolescents; rinse the mouth afterwards."},
 
     # --- Cefixime -------------------------------------------------------
-    {"medicine_name": "Cefixime 200mg", "age_group": "18+", "dosage_amount": 200,
-     "dosage_unit": "mg", "frequency": "Twice daily", "duration_days": 7,
-     "indication": "Respiratory or urinary tract infection",
-     "special_notes": "200 mg twice daily; reduce to once daily in renal impairment. Complete the full course even if symptoms resolve early."},
-
     # --- Nitrofurantoin -------------------------------------------------
     {"medicine_name": "Nitrofurantoin 100mg", "age_group": "18+", "dosage_amount": 100,
      "dosage_unit": "mg", "frequency": "Twice daily", "duration_days": 5,

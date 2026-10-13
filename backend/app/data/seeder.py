@@ -297,6 +297,11 @@ OPENING_STOCK = {
     "Lactulose Solution": (96, 30, 220, "Shelf C1 - Gastro"),
     "Rivaroxaban 20mg": (62, 20, 160, "Shelf D2 - Cardiovascular"),
     "Folic Acid 5mg": (520, 120, 1100, "Shelf G1 - Vitamins"),
+    "Amoxicillin Dry Syrup 30ml": (145, 40, 350, "Shelf B2 - Antibiotics"),
+    "Cetirizine Syrup 60ml": (175, 45, 400, "Shelf E1 - Antihistamines"),
+    "Metoprolol 50mg": (310, 80, 800, "Shelf D2 - Cardiovascular"),
+    "Norfloxacin 400mg": (195, 50, 500, "Shelf B2 - Antibiotics"),
+    "Paracetamol Syrup 60ml": (210, 55, 500, "Shelf F2 - Paediatric"),
 }
 
 

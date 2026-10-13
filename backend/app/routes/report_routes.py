@@ -644,7 +644,7 @@ def _inscription_rows(prescription):
         # special direction - so it reads correctly to a pharmacist.
         dose_bit = f'{_format_num(item.dosage_amount)} {_e(item.dosage_unit)}'.strip()
         freq_bit = _sig_abbrev(item.frequency)
-        is_syrup = (item.medicine_form or '').lower() == 'syrup'
+        is_syrup = form.lower() == 'syrup'
         unit_class = 'unit unit-ml' if is_syrup else 'unit'
         syrup_badge = '<span class="rx-syrup-badge">Syrup</span>' if is_syrup else ''
         sig_html = (f'<span class="rx-dose">'

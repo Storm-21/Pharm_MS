@@ -225,22 +225,6 @@ BATCH7_MEDICINES = [
         max_dose="Two tablets twice daily",
         cost=22.0, price=58.0),
 
-    _med(
-        "Clindamycin 300mg", "Clindamycin", "Antibiotic - lincosamide",
-        "50S ribosomal inhibitor",
-        "Skin and soft tissue infection, MRSA skin infection, dental and anaerobic infection, bone and joint infection",
-        strength="300mg", form="capsule", brand="Dalacin C",
-        formula="C18H33ClN2O5S", weight="424.98 g/mol",
-        half_life="2-3 hours",
-        moa="Binds the 50S ribosomal subunit and blocks peptide bond formation. Its practical value is reliable activity against most Staphylococcus aureus, including many community MRSA strains, and against anaerobes including Bacteroides.",
-        side_effects="Diarrhoea (the commonest reason for stopping), nausea, abdominal pain, rash, antibiotics-associated colitis.",
-        contra="Previous pseudomembranous colitis, hypersensitivity to lincosamides.",
-        warnings="CLOSTRIDIOIDES DIFFICILE COLITIS IS THE DEFINING RISK and it can begin weeks after the course ends - tell the patient that diarrhoea starting up to a month later must be reported and must not be self-treated with an antidiarrhoeal. Take with a full glass of water, because it causes oesophageal irritation if it lodges. It does not cover Gram-negative organisms, so it is not a substitute for broad-spectrum cover in an undifferentiated serious infection.",
-        interactions="Neuromuscular blockers (enhanced blockade), erythromycin (antagonism at the same ribosomal site), warfarin",
-        pregnancy="B - considered acceptable",
-        max_dose="1.8 g/day orally",
-        cost=88.0, price=186.0),
-
     # =================================================================== #
     # ANTIFUNGALS
     # =================================================================== #
@@ -705,12 +689,6 @@ BATCH7_GUIDES = [
      "frequency": 'Twice daily', "duration_days": 5,
      "indication": 'Urinary tract infection, respiratory infection',
      "special_notes": 'STOP AND REPORT ANY RASH OR MOUTH ULCER IMMEDIATELY - Stevens-Johnson syndrome is rare but serious and usually begins in the first weeks. It raises potassium, so it is hazardous with an ACE inhibitor, an ARB or a potassium-sparing diuretic. It causes haemolysis in glucose-6-phosphate dehydrogenase deficiency, which is common in India - check before a course. Take with plenty of water. Elderly: Check renal function and review the patient\u2019s other medicines for the potassium interaction.'},
-
-    {"medicine_name": 'Clindamycin 300mg', "age_group": '18+',
-     "dosage_amount": 300, "dosage_unit": 'mg',
-     "frequency": 'Four times daily', "duration_days": 7,
-     "indication": 'Skin and soft tissue infection, dental or anaerobic infection',
-     "special_notes": 'Tell the patient that diarrhoea starting up to a month AFTER finishing must be reported and must not be self-treated with an antidiarrhoeal - that is the pattern of Clostridioides difficile colitis. Take with a full glass of water to avoid oesophageal irritation. It does not cover Gram-negative organisms. Elderly: Higher risk of C. difficile colitis and of dehydration from diarrhoea.'},
 
     {"medicine_name": 'Terbinafine 250mg', "age_group": '18+',
      "dosage_amount": 250, "dosage_unit": 'mg',

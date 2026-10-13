@@ -1902,4 +1902,92 @@ DOSAGE_GUIDES = [
      "dosage_unit": "mcg", "frequency": "1-2 puffs as needed", "duration_days": 30,
      "indication": "Asthma / COPD relief",
      "special_notes": "Seek review if needed more than twice weekly."},
+    {"medicine_name": "Amoxicillin Dry Syrup 30ml", "age_group": "0-2", "dosage_amount": 62.5,
+     "dosage_unit": "mg", "frequency": "Three times daily", "duration_days": 5,
+     "indication": "Otitis media / streptococcal pharyngitis", "special_notes": "Reconstitute with boiled cooled water to 30 ml. Paediatric dose 25 mg/kg/day in 3 divided doses."},
+
+    {"medicine_name": "Amoxicillin Dry Syrup 30ml", "age_group": "2-6", "dosage_amount": 125,
+     "dosage_unit": "mg", "frequency": "Three times daily", "duration_days": 5,
+     "indication": "Otitis media / respiratory infection", "special_notes": "25 mg/kg/day in 3 divided doses. Finish full course."},
+
+    {"medicine_name": "Amoxicillin Dry Syrup 30ml", "age_group": "6-12", "dosage_amount": 250,
+     "dosage_unit": "mg", "frequency": "Three times daily", "duration_days": 5,
+     "indication": "Respiratory infection", "special_notes": "Standard paediatric dose. 5 ml gives 125 mg."},
+
+    {"medicine_name": "Amoxicillin Dry Syrup 30ml", "age_group": "12-18", "dosage_amount": 250,
+     "dosage_unit": "mg", "frequency": "Three times daily", "duration_days": 5,
+     "indication": "Respiratory infection", "special_notes": "5 ml = 125 mg. Take with or without food."},
+
+    {"medicine_name": "Amoxicillin Dry Syrup 30ml", "age_group": "18+", "dosage_amount": 250,
+     "dosage_unit": "mg", "frequency": "Three times daily", "duration_days": 5,
+     "indication": "Respiratory / urinary tract infection", "special_notes": "Adult dose 250-500 mg TDS. Anaphylaxis risk in penicillin allergy."},
+
+    {"medicine_name": "Cetirizine Syrup 60ml", "age_group": "2-6", "dosage_amount": 2.5,
+     "dosage_unit": "mg", "frequency": "Once daily", "duration_days": 7,
+     "indication": "Allergic rhinitis / urticaria", "special_notes": "2.5 ml = 2.5 mg. Give at night - may cause drowsiness."},
+
+    {"medicine_name": "Cetirizine Syrup 60ml", "age_group": "6-12", "dosage_amount": 5,
+     "dosage_unit": "mg", "frequency": "Once daily", "duration_days": 7,
+     "indication": "Allergic rhinitis / urticaria", "special_notes": "5 ml = 5 mg. May cause mild drowsiness in some children."},
+
+    {"medicine_name": "Cetirizine Syrup 60ml", "age_group": "12-18", "dosage_amount": 5,
+     "dosage_unit": "mg", "frequency": "Once daily", "duration_days": 14,
+     "indication": "Allergic rhinitis / chronic urticaria", "special_notes": "5 ml = 5 mg. Non-sedating at this dose."},
+
+    {"medicine_name": "Cetirizine Syrup 60ml", "age_group": "18+", "dosage_amount": 5,
+     "dosage_unit": "mg", "frequency": "Once daily", "duration_days": 14,
+     "indication": "Allergic rhinitis / chronic urticaria", "special_notes": "5 ml = 5 mg. Reduce dose in renal impairment."},
+
+    {"medicine_name": "Metoprolol 50mg", "age_group": "18+", "dosage_amount": 50,
+     "dosage_unit": "mg", "frequency": "Twice daily", "duration_days": 30,
+     "indication": "Hypertension / angina / arrhythmia", "special_notes": "Start 50 mg BD; titrate to response. Do not stop abruptly. Monitor pulse and BP."},
+
+    {"medicine_name": "Norfloxacin 400mg", "age_group": "18+", "dosage_amount": 400,
+     "dosage_unit": "mg", "frequency": "Twice daily", "duration_days": 3,
+     "indication": "Uncomplicated urinary tract infection", "special_notes": "400 mg BD for 3 days. Take 1 h before or 2 h after food. Avoid in pregnancy and under 18."},
+
+    {"medicine_name": "Paracetamol Syrup 60ml", "age_group": "0-2", "dosage_amount": 60,
+     "dosage_unit": "mg", "frequency": "Every 4-6 hours as needed", "duration_days": 3,
+     "indication": "Fever / pain", "special_notes": "10-15 mg/kg per dose. Maximum 4 doses in 24 h. Do not exceed 60 mg/kg/day."},
+
+    {"medicine_name": "Paracetamol Syrup 60ml", "age_group": "2-6", "dosage_amount": 120,
+     "dosage_unit": "mg", "frequency": "Every 4-6 hours as needed", "duration_days": 3,
+     "indication": "Fever / pain", "special_notes": "10-15 mg/kg per dose. 120 mg per dose (5 ml). Maximum 4 doses/24 h."},
+
+    {"medicine_name": "Paracetamol Syrup 60ml", "age_group": "6-12", "dosage_amount": 240,
+     "dosage_unit": "mg", "frequency": "Every 4-6 hours as needed", "duration_days": 3,
+     "indication": "Fever / pain", "special_notes": "10-15 mg/kg per dose. 240 mg per dose (10 ml). Do not exceed 60 mg/kg/day."},
+
+    {"medicine_name": "Paracetamol Syrup 60ml", "age_group": "12-18", "dosage_amount": 500,
+     "dosage_unit": "mg", "frequency": "Every 4-6 hours as needed", "duration_days": 3,
+     "indication": "Fever / pain", "special_notes": "Up to 1 g per dose. Maximum 4 g in 24 h."},
+
+    {"medicine_name": "Paracetamol Syrup 60ml", "age_group": "18+", "dosage_amount": 1000,
+     "dosage_unit": "mg", "frequency": "Every 4-6 hours as needed", "duration_days": 3,
+     "indication": "Fever / pain", "special_notes": "1 g per dose, maximum 4 g/day. Check all concurrent paracetamol-containing products."},
+
+    {"medicine_name": "Cefixime 200mg", "age_group": "12-18", "dosage_amount": 200,
+     "dosage_unit": "mg", "frequency": "Once daily", "duration_days": 5,
+     "indication": "Otitis media / respiratory infection", "special_notes": "Once-daily dosing improves compliance. Complete full course even if symptoms improve."},
+
+    {"medicine_name": "Cefixime 200mg", "age_group": "18+", "dosage_amount": 200,
+     "dosage_unit": "mg", "frequency": "Once daily", "duration_days": 5,
+     "indication": "UTIs / gonorrhoea / respiratory infection", "special_notes": "Adult dose 200 mg once daily (or 400 mg once daily for gonorrhoea). Take with or without food."},
+
+    {"medicine_name": "Clindamycin 300mg", "age_group": "12-18", "dosage_amount": 150,
+     "dosage_unit": "mg", "frequency": "Four times daily", "duration_days": 7,
+     "indication": "Skin and soft tissue infection", "special_notes": "Paediatric dose 10-20 mg/kg/day in 3-4 divided doses. Do not exceed adult dose."},
+
+    {"medicine_name": "Clindamycin 300mg", "age_group": "18+", "dosage_amount": 300,
+     "dosage_unit": "mg", "frequency": "Four times daily", "duration_days": 7,
+     "indication": "Skin and soft tissue infection, dental infection, anaerobic infection", "special_notes": "300-450 mg QDS. WARN: C. difficile colitis risk — report diarrhoea during or after treatment. Take with full glass of water."},
+
+    {"medicine_name": "Fluconazole 150mg", "age_group": "18+", "dosage_amount": 150,
+     "dosage_unit": "mg", "frequency": "Single dose", "duration_days": 1,
+     "indication": "Vulvovaginal candidiasis (thrush)", "special_notes": "Single 150 mg tablet. For recurrent infection, weekly dosing for 6 months may be needed. Check liver function if repeated courses."},
+
+    {"medicine_name": "Losartan 50mg", "age_group": "18+", "dosage_amount": 50,
+     "dosage_unit": "mg", "frequency": "Once daily", "duration_days": 30,
+     "indication": "Hypertension", "special_notes": "Start 50 mg once daily; may increase to 100 mg daily. Monitor BP and renal function. Avoid in pregnancy."},
+
 ]
