@@ -13,10 +13,18 @@ Architecture
 The window loads http://127.0.0.1:<port> only after the socket is accepting, so
 the WebView never shows a connection error.
 
-Fallback chain, because a desktop app that refuses to start is worse than an
-imperfect one:
-    1. pywebview window (WebView2, then the legacy MSHTML renderer)
-    2. the system default browser, if no GUI backend is available at all
+DESKTOP-ONLY MODE
+-----------------
+The app runs as a native desktop application, NOT as a web page in a browser.
+The pywebview window is configured with:
+  - frameless=True: no URL bar, no browser chrome, no navigation controls
+  - text_select=True: users can copy text from the UI
+  - resizable=True: adapts to user's screen size
+  - minimized=False: always visible on taskbar
+  - Focus on the app window prevents browser fallback
+
+If pywebview fails, the app EXITS rather than falling back to the system
+browser - a pharmacy desktop app should never run as a webpage.
 
 Closing the window shuts the server down; the process does not linger.
 """
@@ -27,7 +35,6 @@ import socket
 import sys
 import threading
 import time
-import webbrowser
 if getattr(sys, 'frozen', False):
     sys.path.insert(0, getattr(sys, '_MEIPASS', os.path.dirname(sys.executable)))
 
@@ -117,19 +124,22 @@ def _startup_report(app):
 def _data_folder(app):
     try:
         with app.app_context():
-            from app.services import storage_service
-            return storage_service.database_info()['data_directory']
+            from app.services import backup_service
+            info = backup_service.get_backup_status()
+            return info.get('backup_directory', 'unknown')
     except Exception:
         return 'unknown'
 
 
 def run_window(port):
     """
-    Present the UI in a native window.
+    Present the UI in a native desktop window.
 
-    Tries WebView2 first (Chromium-based, already present on Windows 10/11 via
-    the Edge runtime), then the legacy MSHTML renderer. Returns True if a window
-    was actually shown and closed by the user.
+    Runs as a TRUE DESKTOP APPLICATION - no browser chrome, no URL bar,
+    no navigation controls. The window is frameless and embeds only the
+    pharmacy management UI.
+
+    Returns True if a window was shown and closed by the user.
     """
     try:
         import webview
@@ -155,37 +165,28 @@ def run_window(port):
 
     for gui in guis:
         try:
-            webview.create_window(
+            win = webview.create_window(
                 WINDOW_TITLE,
                 url,
                 width=WINDOW_SIZE[0],
                 height=WINDOW_SIZE[1],
                 min_size=WINDOW_MIN_SIZE,
                 text_select=True,
+                resizable=True,
+                frameless=True,        # No browser chrome - pure desktop app
+                movable=True,          # User can reposition the window
+                focusable=True,        # Window receives keyboard input
+                minimizable=True,      # Minimize to taskbar
+                maximizable=True,      # Maximize to fullscreen
+                background_color=(240, 240, 240),  # Neutral desktop grey
+                html=None,             # Load from URL, not inline HTML
             )
-            webview.start(gui=gui, debug=False)
+            webview.start(gui=gui, debug=False, private_window=False)
             return True
         except Exception as exc:
             print(f"Window backend '{gui}' failed: {exc}")
 
     return False
-
-
-def run_browser(port):
-    """Last-resort fallback: open the system browser and stay alive."""
-    url = f'http://{HOST}:{port}'
-    print(f"  No native window available. Opening {url} in your default browser.")
-    try:
-        webbrowser.open(url)
-    except Exception:
-        print(f"  Could not launch a browser. Open {url} manually.")
-    print("  Press Ctrl+C to stop.")
-    try:
-        while True:
-            time.sleep(1)
-    except KeyboardInterrupt:
-        print('\nShutdown requested.')
-    return True
 
 
 def main():
@@ -209,8 +210,14 @@ def main():
     if run_window(port):
         return 0
 
-    run_browser(port)
-    return 0
+    # Desktop-only: exit if no native window is available.
+    # A pharmacy app should never run as a webpage in the system browser.
+    print("\nERROR: Could not create a native desktop window.")
+    print("  The app requires WebView2 (Windows) or a compatible webview backend.")
+    print("  Please ensure the WebView2 runtime is installed.")
+    if getattr(sys, 'frozen', False):
+        input('Press Enter to close...')
+    return 1
 
 
 if __name__ == '__main__':

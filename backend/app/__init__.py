@@ -231,15 +231,40 @@ def create_app():
         # Import the settings model so create_all() creates app_settings.
         from app import licensing  # noqa: F401
         db.create_all()
-        # importing registers the AppSetting model before create_all in later versions
-        # create_all() adds missing tables but never missing columns, so an
-        # existing pharmacy database would otherwise fail on the new clinical
-        # fields. Bring the schema forward before anything queries it.
+
+        # Run versioned migrations with full safety guarantees.
+        # This replaces the old apply_migrations() and adds:
+        #   - explicit version tracking in schema_migrations table
+        #   - pre-migration backups
+        #   - transactional execution
+        #   - post-migration validation
+        #   - clear recovery instructions on failure
+        try:
+            from app.migrations_v2 import run_migrations
+            migration_result = run_migrations(db, app.logger)
+            if migration_result.get('skipped'):
+                app.logger.warning('Migration skipped: %s', migration_result.get('reason'))
+            elif migration_result.get('applied'):
+                app.logger.info('Migrations applied: %s', ', '.join(migration_result['applied']))
+        except RuntimeError as exc:
+            # Hard failure: do NOT silently continue with a partial schema.
+            # The app will still start (to allow diagnostic access) but logs
+            # a clear error and provides recovery instructions.
+            app.logger.error('FATAL: Schema migration failed: %s', exc)
+            app.logger.error('Recovery: Check backups/pre-migration-*.db for a safe copy.')
+            # Continue startup so the user can access recovery tools
+        except Exception as exc:
+            app.logger.warning('Schema migration error (continuing): %s', exc)
+
+        # Also run legacy column additions for backward compatibility with
+        # databases that predate the versioned migration system.
         try:
             from app.migrations import apply_migrations
-            apply_migrations(db, app.logger)
-        except Exception as exc:  # never block startup on a migration problem
-            app.logger.warning('Schema migration skipped: %s', exc)
+            legacy_added = apply_migrations(db, app.logger)
+            if legacy_added:
+                app.logger.info('Legacy migrations applied: %s', ', '.join(legacy_added))
+        except Exception as exc:
+            app.logger.warning('Legacy migration error: %s', exc)
 
         try:
             from app.data import ensure_seeded
@@ -247,11 +272,14 @@ def create_app():
         except Exception as exc:  # never let seeding block the app from starting
             app.logger.warning('Reference data seeding skipped: %s', exc)
 
-        # Keep a rolling local snapshot of the database so an accidental delete
-        # or a bad edit can be rolled back. Best-effort: never block startup.
+        # Enhanced startup snapshot with integrity metadata.
         try:
-            from app.services import storage_service
-            storage_service.create_snapshot('startup')
+            from app.services import backup_service
+            snapshot = backup_service.create_versioned_snapshot('startup')
+            if snapshot and snapshot.get('valid'):
+                app.logger.info('Startup snapshot created: %s', snapshot.get('filename'))
+            else:
+                app.logger.warning('Startup snapshot incomplete: %s', snapshot)
         except Exception as exc:
             app.logger.warning('Startup snapshot skipped: %s', exc)
 
