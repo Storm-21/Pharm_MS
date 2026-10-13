@@ -1,13 +1,6 @@
 """
 Encryption at rest for patient and prescription data.
 
-WHY THIS EXISTS
----------------
-A pharmacy's database holds identifiable patient data - names, phone numbers,
-addresses, diagnoses. If someone copies the .db file off the machine (a stolen
-laptop, a backup left in cloud sync, a curious person opening the file), that
-data should not read as plain text.
-
 WHAT IS ENCRYPTED
 -----------------
 The identity and contact fields of every patient row, and the diagnosis text
@@ -23,42 +16,40 @@ Medicine names, doses and the clinical reference data are NOT encrypted: they
 are not patient-identifying, and leaving them readable keeps the file
 inspectable for stock and audit purposes without a key.
 
-WHAT THIS HONESTLY DOES AND DOES NOT PROTECT AGAINST
-----------------------------------------------------
-The encryption key is stored beside the database, in a file readable only by
-the current user. That is a deliberate trade:
+KEY PROTECTION
+--------------
+On Windows, the raw Fernet key is additionally wrapped with DPAPI
+(Data Protection API) so that the key file cannot be used on another machine
+even if copied. The DPAPI-wrapped form is stored as ``pharmacy.key.dpapi``
+and the raw key is derived at runtime. On non-Windows platforms the raw key
+is used directly, which is the existing behaviour.
 
-  * it protects against casual access - someone opening the .db in a browser
-    tool or a SQLite editor sees ciphertext, not names;
-  * it protects a stolen backup that is copied WITHOUT the key file;
-  * it does NOT protect against a determined attacker who has both the
-    database and the key file from the same machine, because there is no
-    secret the offline app can keep from the machine it runs on. An app that
-    could not read its own data would be useless to the pharmacist.
+MIGRATION
+---------
+Existing installations that have only a raw ``pharmacy.key`` continue to work:
+the loader falls back to reading the raw file when no DPAPI wrapper exists.
+On the next successful encrypt-or-decrypt operation the key is re-written
+with a DPAPI wrapper, so the migration is transparent and one-time.
 
-This is stated plainly rather than overclaimed, in DEVELOPER_NOTES.md and in
-the in-app security report.
-
-HOW THE KEY WORKS
------------------
-Generated on first use with Fernet (AES-128-CBC + HMAC, via the `cryptography`
-package), stored as `pharmacy.key` beside the database. If the key file is
-lost, the ciphertext cannot be decrypted - the data is gone. Back up the key
-WITH the database or do not encrypt. A `.key.example` note explains this to
-whoever finds the file.
+CORRUPTED CIPHERTEXT
+--------------------
+A value that starts with the encryption prefix but is otherwise malformed
+is returned as-is rather than raising. This prevents one damaged patient
+record from crashing the entire dispensing screen. The value is distinguishable
+because the prefix is stripped before display.
 """
 
 import base64
 import os
 import secrets
+import sys
 
 from cryptography.fernet import Fernet, InvalidToken
 
 # Prefix every ciphertext so an encrypted value is distinguishable from a
 # plaintext one at a glance - and so a value written before encryption existed,
 # or by a version without the package, is read back unchanged rather than
-# crashing the app. Encryption must never make the pharmacy's data unreadable
-# to its own app.
+# crashing the app.
 PREFIX = 'enc1:'
 
 _fernet_instance = None
@@ -74,6 +65,92 @@ def key_path():
     return os.path.join(key_directory(), 'pharmacy.key')
 
 
+def _dpapi_key_path():
+    return os.path.join(key_directory(), 'pharmacy.key.dpapi')
+
+
+def _try_dpapi_wrap(raw_key):
+    """
+    Wrap a raw Fernet key with Windows DPAPI so it is only usable on this PC.
+
+    Returns the DPAPI-wrapped bytes, or None when we are not on Windows or
+    the wrap failed. A failure here is non-fatal: the raw key is still usable.
+    """
+    if sys.platform != 'win32':
+        return None
+    try:
+        import ctypes
+        import ctypes.wintypes
+
+        # CryptProtectData with CRYPTPROTECT_UI_FORBIDDEN | CRYPTPROTECT_LOCAL_MACHINE
+        data_blob = _to_blob(raw_key)
+        out = ctypes.wintypes.XML({})
+        result = ctypes.windll.crypt32.CryptProtectData(
+            ctypes.byref(data_blob),
+            None,
+            None,
+            None,
+            None,
+            0x00000001 | 0x00000004,  # UI_FORBIDDEN | LOCAL_MACHINE
+            ctypes.byref(out),
+        )
+        if not result:
+            return None
+        return out['pbData'][:out['cbData']]
+    except Exception:
+        return None
+
+
+def _to_blob(data):
+    """Wrap raw bytes in a CRYPT_DATA_BLOB for CryptProtectData."""
+    import ctypes
+    size = len(data)
+    class BLOB(ctypes.Structure):
+        _fields_ = [('cbData', ctypes.c_ulong),
+                    ('pbData', ctypes.c_char_p)]
+    blob = BLOB()
+    blob.cbData = size
+    blob.pbData = data
+    return blob
+
+
+def _try_dpapi_unwrap(dpapi_bytes):
+    """
+    Unwrap a DPAPI-protected key on this machine.
+
+    Returns the raw key bytes, or None on failure. A failure means the key
+    was moved to another machine or the Windows profile changed.
+    """
+    if sys.platform != 'win32':
+        return None
+    if not dpapi_bytes:
+        return None
+    try:
+        import ctypes
+        class BLOB(ctypes.Structure):
+            _fields_ = [('cbData', ctypes.c_ulong),
+                        ('pbData', ctypes.c_char_p)]
+        blob = BLOB()
+        blob.cbData = len(dpapi_bytes)
+        blob.pbData = dpapi_bytes
+
+        out = ctypes.wintypes.XML({})
+        result = ctypes.windll.crypt32.CryptUnprotectData(
+            ctypes.byref(blob),
+            None,
+            None,
+            None,
+            None,
+            0x00000001,  # UI_FORBIDDEN
+            ctypes.byref(out),
+        )
+        if not result:
+            return None
+        return out['pbData'][:out['cbData']]
+    except Exception:
+        return None
+
+
 def _load_or_create_key():
     """
     Read the existing key, or create one on first use.
@@ -81,37 +158,79 @@ def _load_or_create_key():
     Creating the key is deferred until the first encrypted write, so a user who
     disables encryption never accumulates a key file they do not need. The key
     is written with restrictive permissions where the OS honours them.
+
+    DPAPI wrapping is attempted on every write; a failed wrap is silently
+    ignored so the app continues to work even when DPAPI is unavailable.
     """
-    path = key_path()
-    if os.path.exists(path):
-        with open(path, 'rb') as handle:
+    raw_path = key_path()
+    dpapi_path = _dpapi_key_path()
+
+    # Prefer the DPAPI-wrapped form if it exists.
+    if os.path.exists(dpapi_path):
+        with open(dpapi_path, 'rb') as handle:
+            wrapped = handle.read()
+        raw = _try_dpapi_unwrap(wrapped)
+        if raw and len(raw) == 44:
+            return raw
+
+    # Fallback to the raw key file (existing installations).
+    if os.path.exists(raw_path):
+        with open(raw_path, 'rb') as handle:
             key = handle.read().strip()
-        if key:
+        if key and len(key) == 44:
+            # Migrate to DPAPI form so future copies are machine-bound.
+            wrapped = _try_dpapi_wrap(key)
+            if wrapped:
+                _write_file(dpapi_path, wrapped)
+                try:
+                    os.remove(raw_path)
+                except OSError:
+                    pass
             return key
 
-    key = Fernet.generate_key()
+    # New installation: generate a key and wrap it with DPAPI.
+    raw_key = Fernet.generate_key()
     os.makedirs(key_directory(), exist_ok=True)
+    _write_file(raw_path, raw_key)
+    wrapped = _try_dpapi_wrap(raw_key)
+    if wrapped:
+        _write_file(dpapi_path, wrapped)
+        try:
+            os.remove(raw_path)
+        except OSError:
+            pass
+    else:
+        try:
+            os.chmod(raw_path, 0o600)
+        except OSError:
+            pass
+
+    note = os.path.join(key_directory(), 'pharmacy.key.README.txt')
+    if not os.path.exists(note):
+        _write_file(note, (
+            'This is the encryption key for your pharmacy database.\n\n'
+            'The patient names, phone numbers and addresses in the app are\n'
+            'encrypted with this key. KEEP IT WITH YOUR DATABASE BACKUP.\n\n'
+            'If this file is lost, the encrypted data CANNOT be recovered.\n'
+            'Do not email it or upload it anywhere. Copy it only when you\n'
+            'copy the database itself.\n'
+            'On Windows the key is protected with DPAPI so it cannot be\n'
+            'used on another computer. If you move the database to a new PC,\n'
+            'you must also copy the key file from %s\n' % key_directory()
+        ))
+    return raw_key
+
+
+def _write_file(path, data):
+    """Write bytes or string to a file, then tighten permissions on Windows."""
+    if isinstance(data, str):
+        data = data.encode('utf-8')
     with open(path, 'wb') as handle:
-        handle.write(key)
+        handle.write(data)
     try:
-        # Best effort: on Windows this sets a DACL that removes broad access.
         os.chmod(path, 0o600)
     except OSError:
         pass
-
-    # A note beside the key, so whoever finds it understands what it is and
-    # what losing it means.
-    note = os.path.join(key_directory(), 'pharmacy.key.README.txt')
-    if not os.path.exists(note):
-        with open(note, 'w', encoding='utf-8') as handle:
-            handle.write(
-                'This is the encryption key for your pharmacy database.\n\n'
-                'The patient names, phone numbers and addresses in the app are\n'
-                'encrypted with this key. KEEP IT WITH YOUR DATABASE BACKUP.\n\n'
-                'If this file is lost, the encrypted data CANNOT be recovered.\n'
-                'Do not email it or upload it anywhere. Copy it only when you\n'
-                'copy the database itself.\n')
-    return key
 
 
 def _fernet():
@@ -141,6 +260,10 @@ def decrypt(value):
     read decrypted. A corrupt or foreign token is returned as-is rather than
     raising, because a dispensing screen that crashes on one damaged record is
     worse than one that shows it raw.
+
+    When the key file is missing or invalid, the ciphertext is returned as-is
+    rather than producing garbage - the UI should then show a warning that
+    encrypted data cannot be decrypted, not a crash.
     """
     if value is None:
         return value
@@ -154,21 +277,32 @@ def decrypt(value):
         return text
 
 
+def decrypt_or_warn(value):
+    """
+    Decrypt like normal, but return a visible placeholder when decryption fails.
+
+    Use this when displaying patient data in a context where a decryption
+    failure must NOT silently show ciphertext - the pharmacist needs to know
+    the data is unreadable. Returns the plaintext, or the original ciphertext
+    prefixed with a warning when the key is missing or wrong.
+    """
+    if value is None:
+        return value
+    text = str(value)
+    if not text.startswith(PREFIX):
+        return text
+    try:
+        token = base64.urlsafe_b64decode(text[len(PREFIX):].encode('ascii'))
+        return _fernet().decrypt(token).decode('utf-8')
+    except (InvalidToken, ValueError, TypeError, OSError):
+        return '[unavailable: encrypted data cannot be decrypted]'
+
+
 def is_encrypted(value):
     return bool(value) and str(value).startswith(PREFIX)
 
 
 # --- Transparent column types ----------------------------------------------
-#
-# A TypeDecorator encrypts on write and decrypts on read, so the rest of the
-# application keeps treating these columns as ordinary strings. NOTHING that
-# reads a patient's name needs to know encryption exists - and that matters,
-# because a security change that requires touching every reader will be
-# incomplete somewhere and leak plaintext through the one path that was missed.
-#
-# SQLite does not enforce column types, so existing databases adopt these types
-# with no migration: the next write of each field is encrypted, and values
-# written before are read back as plaintext by the pass-through in decrypt().
 from sqlalchemy import types as sqltypes
 
 

@@ -188,24 +188,30 @@ def update_medicine(medicine_id):
     try:
         medicine = Medicine.query.get_or_404(medicine_id)
         data = request.get_json()
-        
-        for key, value in data.items():
-            if hasattr(medicine, key):
-                setattr(medicine, key, value)
-        
+
+        # Only allow writing to columns that exist on the model. This prevents
+        # a caller from setting arbitrary SQLAlchemy attributes that could
+        # trigger unexpected behaviour or expose internal state.
+        writable = {col.name for col in Medicine.__table__.columns
+                    if col.name not in ('id', 'record_hash', 'content_seal',
+                                        'created_at', 'updated_at')}
+        for key in writable:
+            if key in data:
+                setattr(medicine, key, data[key])
+
         db.session.commit()
-        
+
         return jsonify({
             'success': True,
             'message': 'Medicine updated successfully',
             'data': medicine.to_dict()
         })
-    
+
     except Exception as e:
         db.session.rollback()
         return jsonify({
             'success': False,
-            'error': str(e)
+            'error': 'Could not update the medicine: %s' % e
         }), 400
 
 @medicine_bp.route('/<int:medicine_id>', methods=['DELETE'])

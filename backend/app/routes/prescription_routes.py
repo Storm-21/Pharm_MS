@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify
 from app import db
 from app.models import Prescription, PrescriptionItem, Medicine, Patient
 from app.models.prescription import parse_dose_schedule
+from app.models.audit_log import audit_log
 from datetime import datetime
 
 prescription_bp = Blueprint('prescriptions', __name__, url_prefix='/api/prescriptions')
@@ -93,6 +94,10 @@ def create_prescription():
 
         db.session.commit()
 
+        audit_log('prescription_create', 'prescription',
+                  record_id=prescription.id,
+                  detail='created for patient %d' % prescription.patient_id)
+
         return jsonify({
             'success': True,
             'message': 'Prescription created successfully',
@@ -122,6 +127,9 @@ def update_prescription(prescription_id):
 
         db.session.commit()
 
+        audit_log('prescription_update', 'prescription',
+                  record_id=prescription_id, detail='updated')
+
         return jsonify({
             'success': True,
             'message': 'Prescription updated successfully',
@@ -142,6 +150,9 @@ def delete_prescription(prescription_id):
         prescription = Prescription.query.get_or_404(prescription_id)
         db.session.delete(prescription)
         db.session.commit()
+
+        audit_log('prescription_delete', 'prescription',
+                  record_id=prescription_id, detail='deleted')
 
         return jsonify({
             'success': True,

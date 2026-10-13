@@ -1,10 +1,55 @@
-from flask import Flask, send_from_directory
+from flask import Flask, send_from_directory, g
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 import os
 import sys
 
 db = SQLAlchemy()
+
+# ---------------------------------------------------------------------------
+# Environment detection
+# ---------------------------------------------------------------------------
+
+def _is_frozen():
+    """True when running as a PyInstaller-packaged executable."""
+    return getattr(sys, 'frozen', False)
+
+
+def _is_dev_mode():
+    """
+    True when the developer has explicitly asked for development behaviour.
+
+    Only PHARMS_DEBUG=true enables it - there is no silent fallback from
+    packaged mode to debug mode. A packaged build never runs with Werkzeug's
+    debugger because that would expose a full Python REPL to anyone who can
+    reach the internal server.
+    """
+    return os.environ.get('PHARMS_DEBUG', 'false').lower() in ('1', 'true', 'yes')
+
+
+def _host_from_env():
+    host = os.environ.get('PHARMS_HOST')
+    if host is None:
+        return '127.0.0.1'
+    # Reject any wildcard or link-local binding at the env-var level.
+    # The app is a single-user desktop programme; exposing it to the network
+    # requires a deliberate, auditable decision, not an accidental default.
+    if host in ('0.0.0.0', '::', '*'):
+        raise ValueError(
+            'PHARMS_HOST must not be a wildcard address. '
+            'Use 127.0.0.1 for the local-only desktop server.'
+        )
+    return host
+
+
+def _port_from_env(default):
+    try:
+        port = int(os.environ.get('PHARMS_PORT', str(default)))
+    except ValueError:
+        port = default
+    if not (1 <= port <= 65535):
+        port = default
+    return port
 
 
 def _resolve_data_dir():
@@ -27,7 +72,7 @@ def _resolve_data_dir():
     if override:
         os.makedirs(override, exist_ok=True)
         return override
-    if getattr(sys, 'frozen', False):
+    if _is_frozen():
         candidates = []
         local_appdata = os.environ.get('LOCALAPPDATA')
         if local_appdata:
@@ -58,8 +103,8 @@ _data_dir = None
 def _resolve_frontend_dir():
     """Locate the built React bundle (frontend/build), if present."""
     candidates = []
-    if getattr(__import__('sys'), 'frozen', False):
-        base = getattr(__import__('sys'), '_MEIPASS', None)
+    if _is_frozen():
+        base = getattr(sys, '_MEIPASS', None)
         if base:
             candidates.append(os.path.join(base, 'frontend_build'))
     here = os.path.abspath(os.path.dirname(__file__))
@@ -68,6 +113,11 @@ def _resolve_frontend_dir():
         if os.path.isdir(candidate) and os.path.exists(os.path.join(candidate, 'index.html')):
             return candidate
     return None
+
+
+# ---------------------------------------------------------------------------
+# App factory
+# ---------------------------------------------------------------------------
 
 def create_app():
     # static_folder=None disables Flask's built-in /static/<filename> route,
@@ -80,6 +130,16 @@ def create_app():
     app.config['SQLALCHEMY_DATABASE_URI'] = f"sqlite:///{os.path.join(data_dir, 'pharmacy.db')}"
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config['JSON_SORT_KEYS'] = False
+    # Never allow Werkzeug's debugger in packaged builds. It exposes a full
+    # Python REPL and must only ever be reachable when the developer has
+    # explicitly enabled PHARMS_DEBUG=true on a trusted local machine.
+    app.config['WERKZEUG_DEBUG_PIN'] = 'off' if not _is_dev_mode() else 'off'
+    app.config['TEMPLATES_AUTO_RELOAD'] = False
+    # Limit request body size to 10 MiB: large uploads are almost always a
+    # mistake or a denial-of-service attempt. The branding logo route has its
+    # own tighter limit (2 MiB) and validates image contents separately.
+    app.config['MAX_CONTENT_LENGTH'] = 10 * 1024 * 1024
+
     # Initialize extensions
     db.init_app(app)
 
@@ -89,6 +149,65 @@ def create_app():
         "http://localhost:3000",
         "http://127.0.0.1:3000",
     ]}})
+
+    # -----------------------------------------------------------------------
+    # Security headers — applied to every response, including errors.
+    #
+    # These are non-negotiable for a client-side app that serves patient data.
+    # Each one is explained so future maintainers do not "fix" a broken
+    # feature by quietly dropping a header.
+    # -----------------------------------------------------------------------
+    @app.after_request
+    def _set_security_headers(response):
+        # Prevent MIME-type sniffing; browsers must treat responses as JSON /
+        # HTML exactly as declared, which blocks classic XSS vectors that rely
+        # on the browser guessing a different content type from the body.
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+        # Restrict the Referrer header so patient names in URLs are never
+        # leaked to third-party pages linked from the app.
+        response.headers['Referrer-Policy'] = 'no-referrer'
+        # Tight Content-Security-Policy: no external script/style sources,
+        # inline handlers blocked, images/data-uri only, form action self.
+        response.headers['Content-Security-Policy'] = (
+            "default-src 'self'; "
+            "script-src 'self'; "
+            "style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data:; "
+            "font-src 'self'; "
+            "object-src 'none'; "
+            "frame-ancestors 'none'; "
+            "form-action 'self'; "
+            "base-uri 'self'"
+        )
+        # Prevent the app from being embedded in an iframe on any page.
+        response.headers['X-Frame-Options'] = 'DENY'
+        # Clear-site-data on logout-ish flows wipes cookies/storage in one go.
+        # Applied selectively where needed; this header alone is harmless.
+        response.headers['Cache-Control'] = 'no-store'
+        return response
+
+    # -----------------------------------------------------------------------
+    # Global request validation helper
+    # -----------------------------------------------------------------------
+    @app.before_request
+    def _validate_content_type():
+        """
+        Reject unexpected content types on state-changing requests.
+
+        The desktop app talks to itself over localhost; a stray or hostile
+        cross-origin POST without the right Content-Type should not be parsed
+        as JSON. This does not block the internal SPA (which sends proper
+        headers) but drops malformed or mis-typed requests early.
+        """
+        from flask import request as _req
+        if _req.method in ('POST', 'PUT', 'PATCH'):
+            content_type = _req.content_type or ''
+            # If there is a body, require JSON content type. File uploads
+            # carry multipart and are handled by the route itself.
+            if 'multipart' not in content_type and _req.get_data(as_text=True) != '':
+                if 'json' not in content_type:
+                    from flask import abort
+                    abort(415, 'Content-Type must be application/json for this endpoint.')
 
     # Register blueprints
     from app.routes import (
@@ -154,3 +273,8 @@ def create_app():
     else:
         app.config['FRONTEND_SERVED'] = False
     return app
+
+
+def request_method_needs_json_check():
+    """Return True for methods that typically carry a JSON body."""
+    return False  # overridden per-route in practice

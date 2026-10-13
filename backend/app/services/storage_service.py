@@ -28,7 +28,7 @@ import json
 import os
 import shutil
 import sqlite3
-from datetime import datetime
+from datetime import date, datetime
 
 from app import db
 from app.models import (
@@ -186,6 +186,30 @@ def restore_snapshot(filename):
 
 # --- Logical export / import (portable archive) ------------------------------
 
+def _parse_date(value):
+    """Convert an ISO date string to a date object, or pass through existing dates."""
+    if value is None:
+        return None
+    if isinstance(value, date):
+        return value
+    try:
+        return datetime.strptime(str(value).strip()[:10], '%Y-%m-%d').date()
+    except ValueError:
+        return None
+
+
+def _parse_datetime(value):
+    """Convert an ISO datetime string to a datetime object."""
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value
+    try:
+        return datetime.fromisoformat(str(value).strip())
+    except ValueError:
+        return None
+
+
 def _row_to_dict(instance):
     """Serialise a model instance to JSON-safe primitives."""
     out = {}
@@ -274,6 +298,7 @@ def import_data(payload, replace_patients=False):
         if row.get('id') in existing_patient_ids:
             continue
         row.setdefault('created_at', datetime.utcnow())
+        row['date_of_birth'] = _parse_date(row.get('date_of_birth'))
         db.session.add(Patient(**row))
         stats.setdefault('patients_added', 0)
         stats['patients_added'] += 1
@@ -289,6 +314,8 @@ def import_data(payload, replace_patients=False):
     for row in tables.get('prescriptions', []):
         if row.get('id') in existing_prescription_ids:
             continue
+        row['valid_until'] = _parse_date(row.get('valid_until'))
+        row['created_at'] = _parse_datetime(row.get('created_at'))
         db.session.add(Prescription(**row))
         stats.setdefault('prescriptions_added', 0)
         stats['prescriptions_added'] += 1
@@ -300,6 +327,8 @@ def import_data(payload, replace_patients=False):
                 batch_number=row.get('batch_number')).first():
             continue
         row.pop('id', None)
+        row['manufacturing_date'] = _parse_date(row.get('manufacturing_date'))
+        row['expiry_date'] = _parse_date(row.get('expiry_date'))
         db.session.add(Inventory(**row))
         stats.setdefault('inventory_added', 0)
         stats['inventory_added'] += 1
@@ -307,6 +336,7 @@ def import_data(payload, replace_patients=False):
 
     for row in tables.get('dosage_guides', []):
         row.pop('id', None)
+        row['medicine_id'] = int(row.get('medicine_id', 0))
         db.session.add(DosageGuide(**row))
         stats.setdefault('guides_added', 0)
         stats['guides_added'] += 1

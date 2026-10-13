@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 from app import db
 from app.models import Patient, PatientAllergy
+from app.models.audit_log import audit_log
 from datetime import datetime
 
 patient_bp = Blueprint('patients', __name__, url_prefix='/api/patients')
@@ -187,6 +188,8 @@ def create_patient():
         db.session.add(patient)
         db.session.commit()
 
+        audit_log('patient_create', 'patient', record_id=patient.id, detail='created')
+
         return jsonify({
             'success': True,
             'message': 'Patient created successfully',
@@ -235,6 +238,9 @@ def update_patient(patient_id):
 
         db.session.commit()
 
+        audit_log('patient_update', 'patient', record_id=patient.id,
+                  detail='updated')
+
         return jsonify({
             'success': True,
             'message': 'Patient updated successfully',
@@ -258,6 +264,9 @@ def delete_patient(patient_id):
         patient = Patient.query.get_or_404(patient_id)
         db.session.delete(patient)
         db.session.commit()
+
+        audit_log('patient_delete', 'patient', record_id=patient_id,
+                  detail='deleted')
 
         return jsonify({
             'success': True,
@@ -340,7 +349,10 @@ def add_allergy(patient_id):
         
         db.session.add(allergy)
         db.session.commit()
-        
+
+        audit_log('patient_update', 'patient', record_id=patient_id,
+                  detail='allergy added: %s' % allergy.allergen)
+
         return jsonify({
             'success': True,
             'message': 'Allergy added successfully',
@@ -368,7 +380,10 @@ def remove_allergy(patient_id, allergy_id):
         
         db.session.delete(allergy)
         db.session.commit()
-        
+
+        audit_log('patient_update', 'patient', record_id=patient_id,
+                  detail='allergy removed: %s' % allergy.allergen)
+
         return jsonify({
             'success': True,
             'message': 'Allergy removed successfully'

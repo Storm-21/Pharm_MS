@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify
 from app import db
 from app.models import Inventory, Medicine
+from app.models.audit_log import audit_log
 from datetime import date
 
 inventory_bp = Blueprint('inventory', __name__, url_prefix='/api/inventory')
@@ -76,15 +77,17 @@ def create_inventory():
             storage_location=data.get('storage_location'),
         )
         
-        db.session.add(inventory)
         db.session.commit()
-        
+
+        audit_log('inventory_adjust', 'inventory', record_id=inventory.id,
+                  detail='created, stock=%d' % inventory.quantity_in_stock)
+
         return jsonify({
             'success': True,
             'message': 'Inventory item created successfully',
             'data': inventory.to_dict()
         }), 201
-    
+
     except Exception as e:
         db.session.rollback()
         return jsonify({
@@ -109,13 +112,16 @@ def update_inventory(inventory_id):
             item.storage_location = data['storage_location']
         
         db.session.commit()
-        
+
+        audit_log('inventory_adjust', 'inventory', record_id=inventory_id,
+                  detail='updated fields')
+
         return jsonify({
             'success': True,
             'message': 'Inventory updated successfully',
             'data': item.to_dict()
         })
-    
+
     except Exception as e:
         db.session.rollback()
         return jsonify({
@@ -137,13 +143,16 @@ def update_stock(inventory_id):
             item.quantity_in_stock = 0
         
         db.session.commit()
-        
+
+        audit_log('inventory_adjust', 'inventory', record_id=inventory_id,
+                  detail='stock changed by +%d' % quantity_change)
+
         return jsonify({
             'success': True,
             'message': f'Stock updated by {quantity_change}',
             'data': item.to_dict()
         })
-    
+
     except Exception as e:
         db.session.rollback()
         return jsonify({
@@ -213,7 +222,10 @@ def delete_inventory(inventory_id):
         item = Inventory.query.get_or_404(inventory_id)
         db.session.delete(item)
         db.session.commit()
-        
+
+        audit_log('inventory_adjust', 'inventory', record_id=inventory_id,
+                  detail='deleted')
+
         return jsonify({
             'success': True,
             'message': 'Inventory item deleted successfully'

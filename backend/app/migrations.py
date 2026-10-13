@@ -119,6 +119,20 @@ ADDED_TABLES = [
         'CREATE UNIQUE INDEX IF NOT EXISTS ix_activation_tokens_body '
         'ON activation_tokens (body)',
     ),
+    (
+        'audit_log',
+        """CREATE TABLE IF NOT EXISTS audit_log (
+            id INTEGER NOT NULL PRIMARY KEY,
+            timestamp DATETIME NOT NULL,
+            event_type VARCHAR(80) NOT NULL,
+            record_type VARCHAR(60) NOT NULL,
+            record_id INTEGER,
+            detail TEXT,
+            prev_hash VARCHAR(64),
+            event_hash VARCHAR(64) NOT NULL
+        )""",
+        None,
+    ),
 ]
 
 
